@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+supabase
+openai
+pydantic
+pydantic-settings
+python-dotenv
+python-multipart
+httpx
+tenacity
