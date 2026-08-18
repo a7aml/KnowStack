@@ -75,10 +75,10 @@ export const landingSteps = [
 
 export const adminNavItems = [
   { label: "Dashboard", href: "/admin/dashboard", enabled: true },
-  { label: "Users", href: "/admin/users", enabled: false },
+  { label: "RAG Chat", href: "/admin/chat", enabled: false },
   { label: "Documents", href: "/admin/documents", enabled: false },
-  { label: "Settings", href: "/admin/settings", enabled: false },
-  { label: "Logs", href: "/admin/logs", enabled: false },
+  { label: "Users", href: "/admin/users", enabled: true },
+  { label: "Organization Settings", href: "/admin/settings", enabled: true },
 ];
 
 export const employeeNavItems = [

@@ -1,20 +1,73 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { ApiError, employeeLogin } from "@/lib/apiClient";
+import { isValidEmail } from "@/lib/validation";
+
+type Field = "email" | "password";
+
+// Same split-out-for-Suspense reasoning as the admin login page: this banner
+// reads useSearchParams, which needs its own Suspense boundary, so it
+// doesn't force the whole page to client-only rendering at build time.
+function RedirectStatusBanner() {
+  const searchParams = useSearchParams();
+
+  if (searchParams.get("accepted") === "success") {
+    return (
+      <p className="mb-6 rounded-md border border-success-bg bg-success-bg px-3 py-2 text-sm text-success">
+        Account created, please log in.
+      </p>
+    );
+  }
+
+  return null;
+}
 
 export default function EmployeeLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function markTouched(field: Field) {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+  }
+
+  const emailError = !email.trim()
+    ? "Work email is required"
+    : !isValidEmail(email)
+      ? "Enter a valid email address"
+      : null;
+
+  const passwordError = !password ? "Password is required" : null;
+
+  const isFormValid = !emailError && !passwordError;
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    router.push("/chat");
+    setTouched({ email: true, password: true });
+    setSubmitError(null);
+
+    if (!isFormValid) return;
+
+    setIsSubmitting(true);
+    try {
+      // Tokens never touch frontend JS/state — the backend sets them as
+      // httpOnly cookies on this response, so there's nothing to store here.
+      await employeeLogin({ email, password });
+      router.push("/chat");
+    } catch (err) {
+      setSubmitError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -38,7 +91,11 @@ export default function EmployeeLoginPage() {
         </>
       }
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+      <Suspense fallback={null}>
+        <RedirectStatusBanner />
+      </Suspense>
+
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
         <Input
           label="Work email"
           type="email"
@@ -48,6 +105,8 @@ export default function EmployeeLoginPage() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => markTouched("email")}
+          error={touched.email ? (emailError ?? undefined) : undefined}
         />
         <Input
           label="Password"
@@ -58,9 +117,18 @@ export default function EmployeeLoginPage() {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          onBlur={() => markTouched("password")}
+          error={touched.password ? (passwordError ?? undefined) : undefined}
         />
-        <Button type="submit" fullWidth>
-          Sign in
+
+        {submitError ? (
+          <p className="rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
+            {submitError}
+          </p>
+        ) : null}
+
+        <Button type="submit" fullWidth disabled={!isFormValid || isSubmitting}>
+          {isSubmitting ? "Signing in…" : "Sign in"}
         </Button>
       </form>
 

@@ -4,7 +4,15 @@ supabase
 openai
 pydantic
 pydantic-settings
+email-validator
 python-dotenv
 python-multipart
 httpx
 tenacity
+psycopg2-binary
+sqlalchemy
+alembic
+pgvector
+pyjwt
+slowapi
+resend
