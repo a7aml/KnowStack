@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Logo } from "@/components/ui/Logo";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { adminNavItems } from "@/lib/mock-data";
 import {
   ApiError,
   getCurrentUser,
   refreshSession,
-  logout,
   createChatSession,
   listChatSessions,
   listChatMessages,
@@ -19,11 +22,6 @@ import {
   type ChatMessagePublic,
   type ChatSourceCitation,
 } from "@/lib/apiClient";
-
-// Deliberately not the admin DashboardShell/Sidebar: this is the only page
-// an employee ever sees, so it gets its own simple, single-purpose layout
-// (a slim top bar + one centered chat column) rather than a stripped-down
-// copy of the admin dashboard chrome.
 
 function initialsFor(fullName: string | null, email: string): string {
   const source = fullName?.trim() || email;
@@ -42,15 +40,14 @@ function nextTempId(): string {
   return `temp-${Date.now()}-${tempIdCounter}`;
 }
 
-export default function EmployeeChatPage() {
+export default function AdminChatPage() {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isChecking, setIsChecking] = useState(true);
 
   const [sessions, setSessions] = useState<ChatSessionPublic[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessagePublic[]>([]);
@@ -62,6 +59,10 @@ export default function EmployeeChatPage() {
   const [sendError, setSendError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  const [deleteTarget, setDeleteTarget] = useState<ChatSessionPublic | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const selectSession = useCallback(
@@ -70,7 +71,6 @@ export default function EmployeeChatPage() {
       setActiveSessionId(sessionId);
       setMessages([]);
       setMessagesError(null);
-      setHistoryOpen(false);
       setIsLoadingMessages(true);
       try {
         const { messages: fetched } = await listChatMessages(sessionId);
@@ -86,15 +86,15 @@ export default function EmployeeChatPage() {
 
   const loadSessions = useCallback(async () => {
     setIsLoadingSessions(true);
+    setSessionsError(null);
     try {
       const { sessions: fetched } = await listChatSessions();
       setSessions(fetched);
       if (fetched.length > 0) {
         await selectSession(fetched[0].id);
       }
-    } catch {
-      // Non-critical for the initial load — the composer still works even
-      // if history fails to load; the user can retry via the History menu.
+    } catch (err) {
+      setSessionsError(err instanceof ApiError ? err.message : "Could not load chat sessions.");
     } finally {
       setIsLoadingSessions(false);
     }
@@ -117,12 +117,11 @@ export default function EmployeeChatPage() {
       if (cancelled) return;
 
       if (!currentUser) {
-        router.replace("/login");
+        router.replace("/admin/login");
         return;
       }
-      if (currentUser.role !== "employee") {
-        // Admins have their own chat UI at /admin/chat — keep them there.
-        router.replace("/admin/dashboard");
+      if (currentUser.role !== "admin") {
+        router.replace("/login");
         return;
       }
       setUser(currentUser);
@@ -144,39 +143,13 @@ export default function EmployeeChatPage() {
 
   async function handleNewChat() {
     setSendError(null);
-    setHistoryOpen(false);
     try {
       const { session } = await createChatSession();
       setSessions((prev) => [session, ...prev]);
       setActiveSessionId(session.id);
       setMessages([]);
     } catch (err) {
-      setSendError(err instanceof ApiError ? err.message : "Could not start a new chat.");
-    }
-  }
-
-  async function handleDeleteSession(sessionId: string) {
-    setDeletingId(sessionId);
-    try {
-      await deleteChatSession(sessionId);
-      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
-      if (activeSessionId === sessionId) {
-        setActiveSessionId(null);
-        setMessages([]);
-      }
-    } catch {
-      // Left in the list — the user can just try again from the menu.
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  async function loadSessionsQuietly() {
-    try {
-      const { sessions: fetched } = await listChatSessions();
-      setSessions(fetched);
-    } catch {
-      // Non-critical — the auto-generated title just won't show up yet.
+      setSessionsError(err instanceof ApiError ? err.message : "Could not start a new chat.");
     }
   }
 
@@ -236,6 +209,8 @@ export default function EmployeeChatPage() {
             setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, sources } : m)));
           },
           onDone: () => {
+            // Session may have just been titled from this first question —
+            // refresh the sidebar list so its title shows up.
             loadSessionsQuietly();
           },
           onError: (message) => {
@@ -253,6 +228,35 @@ export default function EmployeeChatPage() {
     }
   }
 
+  async function loadSessionsQuietly() {
+    try {
+      const { sessions: fetched } = await listChatSessions();
+      setSessions(fetched);
+    } catch {
+      // Non-critical — the sidebar just won't show the auto-generated
+      // title until the next successful refresh.
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteChatSession(deleteTarget.id);
+      setSessions((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+      if (activeSessionId === deleteTarget.id) {
+        setActiveSessionId(null);
+        setMessages([]);
+      }
+      setDeleteTarget(null);
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : "Could not delete chat.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -260,111 +264,88 @@ export default function EmployeeChatPage() {
     }
   }
 
-  async function handleLogout() {
-    try {
-      await logout();
-    } finally {
-      router.replace("/login");
-    }
-  }
-
   if (isChecking || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-white">
+      <div className="flex min-h-screen items-center justify-center bg-surface-muted">
         <p className="text-sm text-text-muted">Checking your session…</p>
       </div>
     );
   }
 
-  return (
-    <div className="flex h-screen flex-col bg-white">
-      <header className="relative flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:px-6">
-        <Logo />
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setHistoryOpen((open) => !open)}
-            className="rounded-full border border-border-strong px-3 py-1.5 text-xs font-medium text-text-muted hover:bg-surface-sunken"
-          >
-            History
-          </button>
-          <button
-            type="button"
-            onClick={handleNewChat}
-            className="rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover"
-          >
-            New chat
-          </button>
-          <div className="ml-1 flex h-8 w-8 items-center justify-center rounded-full bg-navy-950 text-xs font-semibold text-white">
-            {initialsFor(user.full_name, user.email)}
-          </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="text-xs font-medium text-text-subtle hover:text-text"
-          >
-            Log out
-          </button>
-        </div>
+  const displayName = user.full_name || user.email;
 
-        {historyOpen ? (
-          <div className="absolute right-4 top-full z-20 mt-2 w-72 rounded-lg border border-border bg-surface shadow-lg sm:right-6">
-            <div className="max-h-80 overflow-y-auto p-2">
-              {isLoadingSessions ? (
-                <p className="p-2 text-xs text-text-muted">Loading…</p>
-              ) : sessions.length === 0 ? (
-                <p className="p-2 text-xs text-text-muted">No past chats yet.</p>
-              ) : (
-                <ul className="flex flex-col gap-1">
-                  {sessions.map((s) => (
-                    <li key={s.id} className="group flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => selectSession(s.id)}
-                        className={`flex-1 truncate rounded-md px-3 py-2 text-left text-sm ${
-                          s.id === activeSessionId
-                            ? "bg-navy-950 text-white"
-                            : "text-text-muted hover:bg-surface-sunken hover:text-text"
+  return (
+    <DashboardShell
+      navItems={adminNavItems}
+      activeHref="/admin/chat"
+      pageTitle="RAG Chat"
+      userName={displayName}
+      userRole="Workspace Admin"
+      userInitials={initialsFor(user.full_name, user.email)}
+    >
+      <div className="flex h-[75vh] min-h-[500px] gap-4">
+        <Card padding="none" className="flex w-64 shrink-0 flex-col overflow-hidden">
+          <div className="border-b border-border p-3">
+            <Button variant="primary" size="sm" fullWidth type="button" onClick={handleNewChat}>
+              + New chat
+            </Button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-2">
+            {isLoadingSessions ? (
+              <p className="p-2 text-xs text-text-muted">Loading…</p>
+            ) : sessionsError ? (
+              <p className="p-2 text-xs text-danger">{sessionsError}</p>
+            ) : sessions.length === 0 ? (
+              <p className="p-2 text-xs text-text-muted">No chats yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {sessions.map((s) => (
+                  <li key={s.id} className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => selectSession(s.id)}
+                      className={`w-full truncate rounded-md px-3 py-2 pr-8 text-left text-sm transition-colors ${
+                        s.id === activeSessionId
+                          ? "bg-navy-950 text-white"
+                          : "text-text-muted hover:bg-surface-sunken hover:text-text"
+                      }`}
+                    >
+                      <span className="block truncate">{s.title || "New chat"}</span>
+                      <span
+                        className={`block text-[11px] ${
+                          s.id === activeSessionId ? "text-white/60" : "text-text-subtle"
                         }`}
                       >
-                        <span className="block truncate">{s.title || "New chat"}</span>
-                        <span
-                          className={`block text-[11px] ${
-                            s.id === activeSessionId ? "text-white/60" : "text-text-subtle"
-                          }`}
-                        >
-                          {formatDate(s.created_at)}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Delete chat"
-                        disabled={deletingId === s.id}
-                        onClick={() => handleDeleteSession(s.id)}
-                        className="shrink-0 rounded p-1.5 text-text-subtle hover:text-danger"
-                      >
-                        ✕
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+                        {formatDate(s.created_at)}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Delete chat"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteError(null);
+                        setDeleteTarget(s);
+                      }}
+                      className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-text-subtle hover:text-danger group-hover:block"
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        ) : null}
-      </header>
+        </Card>
 
-      <main className="flex flex-1 flex-col overflow-hidden">
-        <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col overflow-hidden px-4 py-6 sm:px-0">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <Card padding="none" className="flex flex-1 flex-col overflow-hidden">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto p-6">
             {!activeSessionId && messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
-                <h1 className="text-2xl font-semibold text-navy-950">
-                  Hi {user.full_name?.split(" ")[0] || "there"}
-                </h1>
-                <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
-                  Ask anything about {user.organization_name ?? "your organization"}&apos;s
-                  documents — answers come with sources you can check.
+                <h2 className="text-lg font-semibold text-navy-950">Ask your knowledge base</h2>
+                <p className="mt-2 max-w-sm text-sm text-text-muted">
+                  Questions are answered using your organization&apos;s uploaded documents.
+                  Start typing below to begin.
                 </p>
               </div>
             ) : isLoadingMessages ? (
@@ -376,7 +357,7 @@ export default function EmployeeChatPage() {
                 <p className="text-sm text-text-muted">No messages yet. Ask a question below.</p>
               </div>
             ) : (
-              <div className="flex flex-col gap-4 pb-2">
+              <div className="flex flex-col gap-4">
                 {messages.map((m) => (
                   <MessageBubble key={m.id} message={m} />
                 ))}
@@ -386,37 +367,54 @@ export default function EmployeeChatPage() {
           </div>
 
           {sendError ? (
-            <p className="mt-2 rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
+            <div className="border-t border-danger-bg bg-danger-bg px-4 py-2 text-sm text-danger">
               {sendError}
-            </p>
+            </div>
           ) : null}
 
-          <div className="mt-4 flex items-end gap-2 rounded-2xl border border-border-strong bg-surface px-3 py-2 shadow-sm focus-within:border-accent focus-within:ring-2 focus-within:ring-accent">
-            <textarea
-              value={question}
-              onChange={(e) => setQuestion(e.target.value.slice(0, CHAT_QUESTION_MAX_LENGTH))}
-              onKeyDown={handleKeyDown}
-              disabled={isSending}
-              rows={1}
-              placeholder="Message your knowledge assistant…"
-              className="max-h-32 flex-1 resize-none bg-transparent py-1.5 text-sm text-text placeholder:text-text-subtle focus:outline-none disabled:opacity-60"
-            />
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={isSending || !question.trim()}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-white transition-colors hover:bg-accent-hover disabled:bg-navy-200"
-              aria-label="Send"
-            >
-              ↑
-            </button>
+          <div className="border-t border-border p-4">
+            <div className="flex items-end gap-3">
+              <textarea
+                value={question}
+                onChange={(e) => setQuestion(e.target.value.slice(0, CHAT_QUESTION_MAX_LENGTH))}
+                onKeyDown={handleKeyDown}
+                disabled={isSending}
+                rows={2}
+                placeholder="Ask a question about your documents…"
+                className="flex-1 resize-none rounded-md border border-border-strong bg-surface px-3 py-2.5 text-sm text-text placeholder:text-text-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+              />
+              <Button
+                type="button"
+                onClick={handleSend}
+                disabled={isSending || !question.trim()}
+              >
+                {isSending ? "Sending…" : "Send"}
+              </Button>
+            </div>
+            <p className="mt-1 text-right text-[11px] text-text-subtle">
+              {question.length}/{CHAT_QUESTION_MAX_LENGTH}
+            </p>
           </div>
-          <p className="mt-1 text-right text-[11px] text-text-subtle">
-            {question.length}/{CHAT_QUESTION_MAX_LENGTH}
-          </p>
-        </div>
-      </main>
-    </div>
+        </Card>
+      </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete chat"
+        message={`This will permanently remove "${deleteTarget?.title || "this chat"}". Are you sure?`}
+        confirmLabel="Delete"
+        isConfirming={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => {
+          if (!isDeleting) setDeleteTarget(null);
+        }}
+      />
+      {deleteError ? (
+        <p className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md border border-danger-bg bg-danger-bg px-4 py-2 text-sm text-danger shadow-lg">
+          {deleteError}
+        </p>
+      ) : null}
+    </DashboardShell>
   );
 }
 
@@ -424,10 +422,10 @@ function MessageBubble({ message }: { message: ChatMessagePublic }) {
   const isUser = message.role === "user";
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[85%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1.5`}>
+      <div className={`max-w-[80%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1.5`}>
         <div
-          className={`whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm ${
-            isUser ? "bg-accent text-white" : "bg-surface-sunken text-text"
+          className={`whitespace-pre-wrap rounded-lg px-4 py-2.5 text-sm ${
+            isUser ? "bg-navy-950 text-white" : "bg-surface-sunken text-text"
           }`}
         >
           {message.content || (isUser ? "" : "…")}

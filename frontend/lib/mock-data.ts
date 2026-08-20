@@ -75,7 +75,7 @@ export const landingSteps = [
 
 export const adminNavItems = [
   { label: "Dashboard", href: "/admin/dashboard", enabled: true },
-  { label: "RAG Chat", href: "/admin/chat", enabled: false },
+  { label: "RAG Chat", href: "/admin/chat", enabled: true },
   { label: "Documents", href: "/admin/documents", enabled: true },
   { label: "Users", href: "/admin/users", enabled: true },
   { label: "Organization Settings", href: "/admin/settings", enabled: true },

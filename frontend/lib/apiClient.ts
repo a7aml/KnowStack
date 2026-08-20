@@ -453,3 +453,168 @@ export async function authenticatedRequest<T>(
   }
 }
 
+// --- Chat (available to both admin and employee accounts) ------------------
+
+export interface ChatSessionPublic {
+  id: string;
+  title: string | null;
+  created_at: string;
+}
+
+export interface ChatSessionListResponse {
+  sessions: ChatSessionPublic[];
+}
+
+export interface ChatSessionActionResponse {
+  session: ChatSessionPublic;
+  message: string;
+}
+
+export interface ChatSourceCitation {
+  document_id: string;
+  file_name: string;
+  chunk_index: number;
+  snippet: string;
+}
+
+export interface ChatMessagePublic {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  sources: ChatSourceCitation[] | null;
+  created_at: string;
+}
+
+export interface ChatMessageListResponse {
+  messages: ChatMessagePublic[];
+}
+
+export const CHAT_QUESTION_MAX_LENGTH = 2000;
+
+export function createChatSession(): Promise<ChatSessionActionResponse> {
+  return authenticatedRequest<ChatSessionActionResponse>("/chat/sessions", { method: "POST" });
+}
+
+export function listChatSessions(): Promise<ChatSessionListResponse> {
+  return authenticatedRequest<ChatSessionListResponse>("/chat/sessions", { method: "GET" });
+}
+
+export function listChatMessages(sessionId: string): Promise<ChatMessageListResponse> {
+  return authenticatedRequest<ChatMessageListResponse>(`/chat/sessions/${sessionId}/messages`, {
+    method: "GET",
+  });
+}
+
+export function deleteChatSession(sessionId: string): Promise<ChatSessionActionResponse> {
+  return authenticatedRequest<ChatSessionActionResponse>(`/chat/sessions/${sessionId}`, {
+    method: "DELETE",
+  });
+}
+
+export interface StreamChatCallbacks {
+  onToken: (text: string) => void;
+  onSources: (sources: ChatSourceCitation[]) => void;
+  onDone: () => void;
+  onError: (message: string) => void;
+}
+
+// Manually parses "event: X\ndata: Y\n\n" blocks — EventSource can't be used
+// here since it only supports GET with no request body/credentials control,
+// and this endpoint is a POST carrying the question as a JSON body.
+function handleSseEvent(raw: string, callbacks: StreamChatCallbacks): void {
+  let event = "message";
+  let data = "";
+  for (const line of raw.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data += line.slice(5).trim();
+  }
+  if (!data) return;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    return;
+  }
+
+  if (event === "token") {
+    const text = (parsed as { text?: unknown }).text;
+    if (typeof text === "string") callbacks.onToken(text);
+  } else if (event === "sources") {
+    const sources = (parsed as { sources?: unknown }).sources;
+    if (Array.isArray(sources)) callbacks.onSources(sources as ChatSourceCitation[]);
+  } else if (event === "done") {
+    callbacks.onDone();
+  } else if (event === "error") {
+    const message = (parsed as { message?: unknown }).message;
+    callbacks.onError(typeof message === "string" ? message : "Something went wrong.");
+  }
+}
+
+async function streamChatOnce(
+  sessionId: string,
+  question: string,
+  callbacks: StreamChatCallbacks,
+  signal?: AbortSignal
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/chat/sessions/${sessionId}/messages`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question }),
+    signal,
+  });
+
+  if (!res.ok) {
+    const data = await parseBody(res);
+    const detail = (data as { detail?: unknown } | null)?.detail;
+    const fallback =
+      res.status === 429 ? "Too many attempts, try again later." : "Something went wrong. Please try again.";
+    throw new ApiError(res.status, messageFromDetail(detail, fallback), detail);
+  }
+
+  if (!res.body) {
+    throw new Error("Streaming is not supported in this browser.");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let boundary = buffer.indexOf("\n\n");
+    while (boundary !== -1) {
+      const rawEvent = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      handleSseEvent(rawEvent, callbacks);
+      boundary = buffer.indexOf("\n\n");
+    }
+  }
+}
+
+// Streams an assistant response for `question` in the given session,
+// invoking `callbacks` as SSE events arrive. Retries once after a silent
+// refresh on a 401, same as authenticatedRequest — but since the response
+// body may already be partially consumed by the time an error surfaces,
+// this only retries on the initial connection failing, not mid-stream.
+export async function streamChatMessage(
+  sessionId: string,
+  question: string,
+  callbacks: StreamChatCallbacks,
+  signal?: AbortSignal
+): Promise<void> {
+  try {
+    await streamChatOnce(sessionId, question, callbacks, signal);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      await refreshSession();
+      await streamChatOnce(sessionId, question, callbacks, signal);
+      return;
+    }
+    throw err;
+  }
+}
