@@ -7,6 +7,7 @@ from config.settings import settings
 from middleware.rate_limit_middleware import RATE_LIMIT_MESSAGE, limiter
 from routes.auth_routes import router as auth_router
 from routes.chat_routes import router as chat_router
+from routes.dashboard_routes import router as dashboard_router
 from routes.document_routes import router as document_router
 from routes.employee_auth_routes import router as employee_auth_router
 from routes.employee_routes import router as employee_router
@@ -35,6 +36,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(chat_router)
+app.include_router(dashboard_router)
 app.include_router(document_router)
 app.include_router(employee_router)
 app.include_router(employee_auth_router)

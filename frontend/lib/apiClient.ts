@@ -618,3 +618,80 @@ export async function streamChatMessage(
     throw err;
   }
 }
+
+// --- Dashboard (admin-only) --------------------------------------------
+
+export interface DocumentStatusCounts {
+  ready: number;
+  processing: number;
+  failed: number;
+  pending: number;
+  total: number;
+}
+
+export interface DashboardStats {
+  team_members: number;
+  pending_invites: number;
+  documents: DocumentStatusCounts;
+  chat_sessions: number;
+}
+
+export interface DashboardStatsResponse {
+  stats: DashboardStats;
+}
+
+export function getDashboardStats(): Promise<DashboardStatsResponse> {
+  return authenticatedRequest<DashboardStatsResponse>("/dashboard/stats", { method: "GET" });
+}
+
+export type ActivityRange = "7d" | "30d" | "90d";
+
+export interface ActivityPoint {
+  date: string;
+  count: number;
+}
+
+export interface ActivityResponse {
+  range: ActivityRange;
+  points: ActivityPoint[];
+}
+
+export function getDashboardActivity(range: ActivityRange): Promise<ActivityResponse> {
+  return authenticatedRequest<ActivityResponse>(`/dashboard/activity?range=${range}`, {
+    method: "GET",
+  });
+}
+
+export interface LogEntryPublic {
+  id: string;
+  action: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface LogListResponse {
+  logs: LogEntryPublic[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface ListDashboardLogsParams {
+  page?: number;
+  pageSize?: number;
+  action?: string;
+}
+
+export function listDashboardLogs(
+  params: ListDashboardLogsParams = {}
+): Promise<LogListResponse> {
+  const query = new URLSearchParams();
+  query.set("page", String(params.page ?? 1));
+  query.set("page_size", String(params.pageSize ?? 20));
+  if (params.action) query.set("action", params.action);
+  return authenticatedRequest<LogListResponse>(`/dashboard/logs?${query.toString()}`, {
+    method: "GET",
+  });
+}

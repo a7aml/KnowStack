@@ -13,6 +13,10 @@ class Log(Base):
     __table_args__ = (
         Index("ix_logs_organization_id", "organization_id"),
         Index("ix_logs_user_id", "user_id"),
+        # Backs the dashboard's daily-activity GROUP BY and the paginated
+        # activity log's ORDER BY created_at DESC, both always filtered by
+        # organization_id first. See dashboard_service.py.
+        Index("ix_logs_organization_id_created_at", "organization_id", "created_at"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
