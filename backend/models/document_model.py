@@ -35,7 +35,11 @@ class Document(Base):
     )
     file_name: Mapped[str] = mapped_column(String, nullable=False)
     storage_path: Mapped[str] = mapped_column(String, nullable=False)
+    file_size: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="pending")
+    # Populated by tasks/ingestion_tasks.py only when status flips to
+    # 'failed', so an admin can see why without reading worker logs.
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
     )

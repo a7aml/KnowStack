@@ -38,3 +38,36 @@ cd frontend
 npm install
 npm run dev
 ```
+
+### Background jobs (Redis + Celery)
+
+Redis is the Celery broker and result backend. Start it via Docker Compose:
+
+```
+docker-compose up redis
+```
+
+(add `-d` to run it in the background). Redis then listens on `localhost:6379`,
+matching the default `REDIS_URL` in `.env.example`.
+
+With Redis running, start the Celery worker from `backend/` (same venv as the
+API):
+
+```
+cd backend
+celery -A celery_app worker --loglevel=info
+```
+
+**On Windows**, Celery's default worker pool ("prefork") doesn't work — pass
+`--pool=solo`:
+
+```
+celery -A celery_app worker --loglevel=info --pool=solo
+```
+
+The worker and the FastAPI app (`uvicorn main:app`) are separate processes —
+run both if you need background tasks to actually execute.
+
+There are no real background tasks yet — `backend/tasks/example_task.py` is a
+placeholder used only to confirm the worker can pick up and execute a task via
+Redis.

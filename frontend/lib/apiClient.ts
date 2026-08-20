@@ -343,6 +343,97 @@ export function updateOrganization(
   });
 }
 
+// --- Documents (admin-only upload/list/delete) ------------------------------
+
+export type DocumentStatus = "pending" | "processing" | "ready" | "failed";
+
+export interface DocumentPublic {
+  id: string;
+  file_name: string;
+  file_size: number;
+  status: DocumentStatus;
+  error_message: string | null;
+  uploaded_by: string | null;
+  uploaded_by_name: string | null;
+  created_at: string;
+}
+
+export interface DocumentListResponse {
+  documents: DocumentPublic[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface DocumentActionResponse {
+  document: DocumentPublic;
+  message: string;
+}
+
+export const DOCUMENT_ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt"];
+export const DOCUMENT_MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+
+export interface ListDocumentsParams {
+  page?: number;
+  pageSize?: number;
+}
+
+export function listDocuments(params: ListDocumentsParams = {}): Promise<DocumentListResponse> {
+  const query = new URLSearchParams();
+  query.set("page", String(params.page ?? 1));
+  query.set("page_size", String(params.pageSize ?? 20));
+  return authenticatedRequest<DocumentListResponse>(`/documents?${query.toString()}`, {
+    method: "GET",
+  });
+}
+
+export function deleteDocument(documentId: string): Promise<DocumentActionResponse> {
+  return authenticatedRequest<DocumentActionResponse>(`/documents/${documentId}`, {
+    method: "DELETE",
+  });
+}
+
+// Uses its own fetch (not the generic `request` helper) since it sends
+// multipart/form-data, not JSON — the browser needs to set the
+// Content-Type header itself (with the multipart boundary), so it must
+// never be set manually here.
+async function uploadFormData<T>(path: string, formData: FormData): Promise<T> {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+
+  const data = await parseBody(res);
+
+  if (!res.ok) {
+    const detail = (data as { detail?: unknown } | null)?.detail;
+    const fallback =
+      res.status === 413
+        ? "File is too large."
+        : res.status === 429
+          ? "Too many attempts, try again later."
+          : "Something went wrong. Please try again.";
+    throw new ApiError(res.status, messageFromDetail(detail, fallback), detail);
+  }
+
+  return data as T;
+}
+
+export async function uploadDocument(file: File): Promise<DocumentActionResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  try {
+    return await uploadFormData<DocumentActionResponse>("/documents/upload", formData);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      await refreshSession();
+      return uploadFormData<DocumentActionResponse>("/documents/upload", formData);
+    }
+    throw err;
+  }
+}
+
 // For future protected endpoints (dashboard/users/documents/chat): retries
 // once after a silent refresh when the access token has expired. Not used
 // by signup/login/refresh/logout themselves, since a 401 there is a real
@@ -361,3 +452,4 @@ export async function authenticatedRequest<T>(
     throw err;
   }
 }
+

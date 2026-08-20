@@ -58,6 +58,24 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 7
 
+    # --- Redis / Celery (background task infrastructure) ---
+    # Local dev: `docker-compose up redis` starts Redis at this default URL.
+    # The same instance is used as both the Celery broker and result
+    # backend — fine at this scale; split them if that ever becomes a
+    # bottleneck. See backend/celery_app.py for how this is consumed, and
+    # backend/tasks/example_task.py for a placeholder task that proves the
+    # pipeline works end to end.
+    redis_url: str = "redis://localhost:6379/0"
+
+    # Per-task queue routing (e.g. sending document-processing tasks to
+    # their own queue) and per-task retry policies belong here once real
+    # tasks exist — e.g.:
+    #   celery_task_routes: dict[str, dict] = {"tasks.documents.*": {"queue": "documents"}}
+    #   celery_default_retry_delay: int = 60
+    #   celery_max_retries: int = 3
+    # Left as a comment for now: there are no real tasks yet, so there's
+    # nothing to route or set a retry policy for.
+
     @property
     def cookie_secure(self) -> bool:
         # Secure cookies are dropped by browsers over plain HTTP, which is

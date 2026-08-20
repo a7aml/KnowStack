@@ -6,6 +6,7 @@ from slowapi.errors import RateLimitExceeded
 from config.settings import settings
 from middleware.rate_limit_middleware import RATE_LIMIT_MESSAGE, limiter
 from routes.auth_routes import router as auth_router
+from routes.document_routes import router as document_router
 from routes.employee_auth_routes import router as employee_auth_router
 from routes.employee_routes import router as employee_router
 from routes.organization_routes import router as organization_router
@@ -32,6 +33,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
+app.include_router(document_router)
 app.include_router(employee_router)
 app.include_router(employee_auth_router)
 app.include_router(organization_router)

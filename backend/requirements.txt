@@ -16,3 +16,8 @@ pgvector
 pyjwt
 slowapi
 resend
+celery
+redis
+pypdf
+python-docx
+tiktoken
