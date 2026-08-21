@@ -43,7 +43,7 @@ export function Th({ children, className, ...rest }: ThHTMLAttributes<HTMLTableC
 
 export function Td({ children, className, ...rest }: TdHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <td className={cn("py-3 pr-4", className)} {...rest}>
+    <td className={cn("py-2.5 pr-4", className)} {...rest}>
       {children}
     </td>
   );
@@ -51,7 +51,13 @@ export function Td({ children, className, ...rest }: TdHTMLAttributes<HTMLTableC
 
 export function Tr({ children, className, ...rest }: HTMLAttributes<HTMLTableRowElement>) {
   return (
-    <tr className={cn("border-b border-border last:border-0", className)} {...rest}>
+    <tr
+      className={cn(
+        "border-b border-border transition-colors last:border-0 hover:bg-surface-sunken/60",
+        className
+      )}
+      {...rest}
+    >
       {children}
     </tr>
   );

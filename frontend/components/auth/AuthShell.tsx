@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 
 interface AuthShellProps {
@@ -41,13 +42,13 @@ export function AuthShell({
           <p className="mt-3 max-w-sm text-sm leading-6 text-navy-200">
             {panelBody}
           </p>
-          <ul className="mt-6 space-y-2">
+          <ul className="mt-6 space-y-2.5">
             {panelPoints.map((point) => (
               <li
                 key={point}
-                className="flex items-start gap-2 text-sm text-navy-200"
+                className="flex items-start gap-2.5 text-sm text-navy-200"
               >
-                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-navy-400" />
+                <CheckCircle2 size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-navy-400" />
                 {point}
               </li>
             ))}
@@ -61,7 +62,7 @@ export function AuthShell({
 
       {/* Form panel */}
       <div className="flex flex-1 flex-col justify-center px-6 py-12 sm:px-12 lg:px-20">
-        <div className="mx-auto w-full max-w-sm">
+        <div className="mx-auto w-full max-w-sm animate-fade-in-up">
           <Link href="/" className="lg:hidden">
             <Logo />
           </Link>

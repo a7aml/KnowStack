@@ -3,11 +3,26 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import type { LucideIcon } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  LogOut,
+  Mail,
+  MessageSquare,
+  ScrollText,
+  Users,
+} from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
+import { FullPageLoader } from "@/components/ui/FullPageLoader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Alert } from "@/components/ui/Alert";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton, SkeletonTable } from "@/components/ui/Skeleton";
 import { Table, TableHeadRow, Th, Td, Tr } from "@/components/ui/Table";
 import { adminNavItems } from "@/lib/mock-data";
 import {
@@ -89,19 +104,30 @@ function StatTile({
   value,
   subtext,
   badge,
+  icon: Icon,
+  isLoading,
 }: {
   label: string;
   value: string;
   subtext?: string;
   badge?: ReactNode;
+  icon: LucideIcon;
+  isLoading?: boolean;
 }) {
   return (
     <Card padding="md">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-text-subtle">{label}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-navy-50 text-navy-700">
+          <Icon size={16} strokeWidth={1.75} />
+        </div>
         {badge}
       </div>
-      <p className="mt-2 text-2xl font-semibold text-navy-950">{value}</p>
+      <p className="mt-3 text-xs font-medium uppercase tracking-wide text-text-subtle">{label}</p>
+      {isLoading ? (
+        <Skeleton className="mt-2 h-7 w-16" />
+      ) : (
+        <p className="mt-1 text-2xl font-semibold text-navy-950">{value}</p>
+      )}
       {subtext ? <p className="mt-0.5 text-xs text-text-subtle">{subtext}</p> : null}
     </Card>
   );
@@ -243,11 +269,7 @@ export default function AdminDashboardPage() {
   }
 
   if (isChecking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-muted">
-        <p className="text-sm text-text-muted">Checking your session…</p>
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   if (!user) {
@@ -279,25 +301,39 @@ export default function AdminDashboardPage() {
             </h2>
           </div>
           <Button variant="secondary" onClick={handleLogout} disabled={isLoggingOut}>
+            <LogOut size={15} strokeWidth={1.75} />
             {isLoggingOut ? "Logging out…" : "Log out"}
           </Button>
         </div>
 
-        {statsError ? (
-          <p className="rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-            {statsError}
-          </p>
-        ) : null}
+        {statsError ? <Alert tone="danger">{statsError}</Alert> : null}
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <StatTile label="Team members" value={statValue(stats?.team_members)} />
-          <StatTile label="Pending invites" value={statValue(stats?.pending_invites)} />
+          <StatTile
+            label="Team members"
+            value={statValue(stats?.team_members)}
+            icon={Users}
+            isLoading={isLoadingStats}
+          />
+          <StatTile
+            label="Pending invites"
+            value={statValue(stats?.pending_invites)}
+            icon={Mail}
+            isLoading={isLoadingStats}
+          />
           <StatTile
             label="Documents"
             value={isLoadingStats ? "…" : stats ? `${stats.documents.ready} ready` : "—"}
             subtext={documentsSubtext(stats)}
+            icon={FileText}
+            isLoading={isLoadingStats}
           />
-          <StatTile label="Chat sessions" value={statValue(stats?.chat_sessions)} />
+          <StatTile
+            label="Chat sessions"
+            value={statValue(stats?.chat_sessions)}
+            icon={MessageSquare}
+            isLoading={isLoadingStats}
+          />
         </div>
 
         <ActivityChart
@@ -309,7 +345,10 @@ export default function AdminDashboardPage() {
 
         <Card padding="lg">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-navy-950">Activity logs</h2>
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-navy-950">
+              <ScrollText size={18} strokeWidth={1.75} className="text-text-subtle" />
+              Activity logs
+            </h2>
             <div className="flex flex-col gap-1.5">
               <label htmlFor="actionFilter" className="sr-only">
                 Filter by action
@@ -318,7 +357,7 @@ export default function AdminDashboardPage() {
                 id="actionFilter"
                 value={actionFilter}
                 onChange={(e) => handleActionFilterChange(e.target.value)}
-                className="rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
+                className="rounded-md border border-border-strong bg-surface px-3 py-2.5 text-sm text-text transition-[border-color,box-shadow] duration-150 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 {ACTION_FILTER_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -330,11 +369,15 @@ export default function AdminDashboardPage() {
           </div>
 
           {isLoadingLogs ? (
-            <p className="mt-4 text-sm text-text-muted">Loading activity…</p>
+            <div className="mt-4">
+              <SkeletonTable rows={6} columns={4} />
+            </div>
           ) : logsError ? (
-            <p className="mt-4 text-sm text-danger">{logsError}</p>
+            <div className="mt-4">
+              <Alert tone="danger">{logsError}</Alert>
+            </div>
           ) : logs.length === 0 ? (
-            <p className="mt-4 text-sm text-text-muted">No activity recorded yet.</p>
+            <EmptyState icon={ScrollText} title="No activity recorded yet" />
           ) : (
             <>
               <div className="mt-4">
@@ -374,6 +417,7 @@ export default function AdminDashboardPage() {
                     disabled={logsPage <= 1}
                     onClick={() => handleLogsPageChange(Math.max(1, logsPage - 1))}
                   >
+                    <ChevronLeft size={14} strokeWidth={1.75} />
                     Previous
                   </Button>
                   <span className="text-xs text-text-muted">
@@ -387,6 +431,7 @@ export default function AdminDashboardPage() {
                     onClick={() => handleLogsPageChange(Math.min(logsTotalPages, logsPage + 1))}
                   >
                     Next
+                    <ChevronRight size={14} strokeWidth={1.75} />
                   </Button>
                 </div>
               </div>

@@ -3,10 +3,25 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ChevronLeft,
+  ChevronRight,
+  File,
+  FileText,
+  FileType,
+  Trash2,
+  UploadCloud,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Alert } from "@/components/ui/Alert";
+import { Toast } from "@/components/ui/Toast";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonTable } from "@/components/ui/Skeleton";
+import { FullPageLoader } from "@/components/ui/FullPageLoader";
 import { Table, TableHeadRow, Th, Td, Tr } from "@/components/ui/Table";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { adminNavItems } from "@/lib/mock-data";
@@ -62,6 +77,16 @@ function formatFileSize(bytes: number): string {
 function extensionOf(fileName: string): string {
   const dot = fileName.lastIndexOf(".");
   return dot === -1 ? "" : fileName.slice(dot).toLowerCase();
+}
+
+const FILE_ICON: Record<string, LucideIcon> = {
+  ".pdf": FileText,
+  ".docx": FileType,
+  ".txt": File,
+};
+
+function iconForFile(fileName: string): LucideIcon {
+  return FILE_ICON[extensionOf(fileName)] ?? File;
 }
 
 function validateFile(file: File): string | null {
@@ -232,11 +257,7 @@ export default function AdminDocumentsPage() {
   }
 
   if (isChecking || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-muted">
-        <p className="text-sm text-text-muted">Checking your session…</p>
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   const displayName = user.full_name || user.email;
@@ -251,147 +272,167 @@ export default function AdminDocumentsPage() {
       userRole={user.role === "admin" ? "Workspace Admin" : "Employee"}
       userInitials={initialsFor(user.full_name, user.email)}
     >
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
-        <Card padding="lg">
-          <h2 className="text-lg font-semibold text-navy-950">Upload a document</h2>
-          <p className="mt-1 text-sm text-text-muted">
-            Accepted formats: PDF, DOCX, TXT. Maximum file size:{" "}
-            {DOCUMENT_MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB.
-          </p>
-
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => fileInputRef.current?.click()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click();
-            }}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            className={`mt-5 flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-6 py-10 text-center transition-colors ${
-              isDragging
-                ? "border-accent bg-navy-50"
-                : "border-border-strong hover:border-accent hover:bg-surface-sunken"
-            } ${isUploading ? "pointer-events-none opacity-60" : "cursor-pointer"}`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".pdf,.docx,.txt"
-              className="hidden"
-              onChange={handleFileInputChange}
-              disabled={isUploading}
-            />
-            <p className="text-sm font-medium text-text">
-              {isUploading ? "Uploading…" : "Drag and drop a file here, or click to browse"}
+      <div className="mx-auto max-w-[1100px]">
+        <Card padding="none">
+          <div className="p-6">
+            <h2 className="text-lg font-semibold text-navy-950">Upload a document</h2>
+            <p className="mt-1 text-sm text-text-muted">
+              Accepted formats: PDF, DOCX, TXT. Maximum file size:{" "}
+              {DOCUMENT_MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB.
             </p>
-            <p className="text-xs text-text-subtle">.pdf, .docx, .txt</p>
-          </div>
 
-          {uploadError ? (
-            <p className="mt-4 rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-              {uploadError}
-            </p>
-          ) : null}
-        </Card>
-
-        <Card padding="lg">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h2 className="text-lg font-semibold text-navy-950">All documents</h2>
-              <p className="mt-1 text-sm text-text-muted">
-                Documents uploaded to {user.organization_name ?? "your organization"}.
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click();
+              }}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              className={`mt-4 flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-6 py-8 text-center transition-colors duration-150 ${
+                isDragging
+                  ? "border-accent bg-navy-50"
+                  : "border-border-strong hover:border-accent hover:bg-surface-sunken"
+              } ${isUploading ? "pointer-events-none opacity-60" : "cursor-pointer"}`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.txt"
+                className="hidden"
+                onChange={handleFileInputChange}
+                disabled={isUploading}
+              />
+              <UploadCloud size={20} strokeWidth={1.75} className="text-text-subtle" />
+              <p className="text-sm font-medium text-text">
+                {isUploading ? "Uploading…" : "Drag and drop a file here, or click to browse"}
               </p>
+              <p className="text-xs text-text-subtle">.pdf, .docx, .txt</p>
             </div>
+
+            {uploadError ? (
+              <div className="mt-4">
+                <Alert tone="danger">{uploadError}</Alert>
+              </div>
+            ) : null}
           </div>
 
-          {isLoading ? (
-            <p className="mt-4 text-sm text-text-muted">Loading documents…</p>
-          ) : listError ? (
-            <p className="mt-4 text-sm text-danger">{listError}</p>
-          ) : documents.length === 0 ? (
-            <p className="mt-4 text-sm text-text-muted">
-              No documents yet. Upload one above to get started.
-            </p>
-          ) : (
-            <>
-              <div className="mt-4">
-                <Table minWidth="720px">
-                  <thead>
-                    <TableHeadRow>
-                      <Th>File name</Th>
-                      <Th>Status</Th>
-                      <Th>Size</Th>
-                      <Th>Uploaded by</Th>
-                      <Th>Uploaded</Th>
-                      <Th>Actions</Th>
-                    </TableHeadRow>
-                  </thead>
-                  <tbody>
-                    {documents.map((doc) => (
-                      <Tr key={doc.id}>
-                        <Td className="text-text">
-                          {doc.file_name}
-                          {doc.status === "failed" && doc.error_message ? (
-                            <p className="mt-0.5 text-xs text-danger">{doc.error_message}</p>
-                          ) : null}
-                        </Td>
-                        <Td>
-                          <Badge tone={STATUS_TONE[doc.status]}>{doc.status}</Badge>
-                        </Td>
-                        <Td className="text-text-muted">{formatFileSize(doc.file_size)}</Td>
-                        <Td className="text-text-muted">{doc.uploaded_by_name || "—"}</Td>
-                        <Td className="text-text-muted">{formatDate(doc.created_at)}</Td>
-                        <Td>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            type="button"
-                            onClick={() => {
-                              setDeleteError(null);
-                              setDeleteTarget(doc);
-                            }}
-                          >
-                            Delete
-                          </Button>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-text-muted">
-                  Showing {documents.length} of {total}
+          <div className="border-t border-border p-6">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-navy-950">All documents</h2>
+                <p className="mt-1 text-sm text-text-muted">
+                  Documents uploaded to {user.organization_name ?? "your organization"}.
                 </p>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    type="button"
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-xs text-text-muted">
-                    Page {page} of {totalPages}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    type="button"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    Next
-                  </Button>
-                </div>
               </div>
-            </>
-          )}
+            </div>
+
+            {isLoading ? (
+              <div className="mt-4">
+                <SkeletonTable rows={5} columns={6} />
+              </div>
+            ) : listError ? (
+              <div className="mt-4">
+                <Alert tone="danger">{listError}</Alert>
+              </div>
+            ) : documents.length === 0 ? (
+              <EmptyState
+                icon={FileText}
+                title="No documents yet"
+                description="Upload one above to get started."
+              />
+            ) : (
+              <>
+                <div className="mt-4">
+                  <Table minWidth="720px">
+                    <thead>
+                      <TableHeadRow>
+                        <Th className="w-2/5">File name</Th>
+                        <Th className="w-24">Status</Th>
+                        <Th className="w-20">Size</Th>
+                        <Th className="w-32">Uploaded by</Th>
+                        <Th className="w-28">Uploaded</Th>
+                        <Th className="w-24">Actions</Th>
+                      </TableHeadRow>
+                    </thead>
+                    <tbody>
+                      {documents.map((doc) => {
+                        const FileIcon = iconForFile(doc.file_name);
+                        return (
+                          <Tr key={doc.id}>
+                            <Td className="text-text">
+                              <div className="flex items-start gap-2.5">
+                                <FileIcon size={16} strokeWidth={1.75} className="mt-0.5 shrink-0 text-text-subtle" />
+                                <div className="min-w-0">
+                                  <p className="truncate">{doc.file_name}</p>
+                                  {doc.status === "failed" && doc.error_message ? (
+                                    <p className="mt-0.5 text-xs text-danger">{doc.error_message}</p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </Td>
+                            <Td>
+                              <Badge tone={STATUS_TONE[doc.status]}>{doc.status}</Badge>
+                            </Td>
+                            <Td className="text-text-muted">{formatFileSize(doc.file_size)}</Td>
+                            <Td className="text-text-muted">{doc.uploaded_by_name || "—"}</Td>
+                            <Td className="text-text-muted">{formatDate(doc.created_at)}</Td>
+                            <Td>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                onClick={() => {
+                                  setDeleteError(null);
+                                  setDeleteTarget(doc);
+                                }}
+                              >
+                                <Trash2 size={14} strokeWidth={1.75} />
+                                Delete
+                              </Button>
+                            </Td>
+                          </Tr>
+                        );
+                      })}
+                    </tbody>
+                  </Table>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-text-muted">
+                    Showing {documents.length} of {total}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      type="button"
+                      disabled={page <= 1}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    >
+                      <ChevronLeft size={14} strokeWidth={1.75} />
+                      Previous
+                    </Button>
+                    <span className="text-xs text-text-muted">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      type="button"
+                      disabled={page >= totalPages}
+                      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    >
+                      Next
+                      <ChevronRight size={14} strokeWidth={1.75} />
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </Card>
       </div>
 
@@ -406,11 +447,7 @@ export default function AdminDocumentsPage() {
           if (!isDeleting) setDeleteTarget(null);
         }}
       />
-      {deleteError ? (
-        <p className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md border border-danger-bg bg-danger-bg px-4 py-2 text-sm text-danger shadow-lg">
-          {deleteError}
-        </p>
-      ) : null}
+      <Toast message={deleteError} tone="danger" onDismiss={() => setDeleteError(null)} />
     </DashboardShell>
   );
 }

@@ -1,5 +1,7 @@
 // Static mock/dummy data for UI purposes only. No backend or persistence involved.
 
+import { FileText, LayoutDashboard, MessageSquare, Settings, Users } from "lucide-react";
+
 export const mockOrg = {
   name: "Acme Industries",
   plan: "Enterprise",
@@ -74,13 +76,13 @@ export const landingSteps = [
 ];
 
 export const adminNavItems = [
-  { label: "Dashboard", href: "/admin/dashboard", enabled: true },
-  { label: "RAG Chat", href: "/admin/chat", enabled: true },
-  { label: "Documents", href: "/admin/documents", enabled: true },
-  { label: "Users", href: "/admin/users", enabled: true },
-  { label: "Organization Settings", href: "/admin/settings", enabled: true },
+  { label: "Dashboard", href: "/admin/dashboard", enabled: true, icon: LayoutDashboard },
+  { label: "RAG Chat", href: "/admin/chat", enabled: true, icon: MessageSquare },
+  { label: "Documents", href: "/admin/documents", enabled: true, icon: FileText },
+  { label: "Users", href: "/admin/users", enabled: true, icon: Users },
+  { label: "Organization Settings", href: "/admin/settings", enabled: true, icon: Settings },
 ];
 
 export const employeeNavItems = [
-  { label: "Chat", href: "/chat", enabled: true },
+  { label: "Chat", href: "/chat", enabled: true, icon: MessageSquare },
 ];

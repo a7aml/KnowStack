@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 
@@ -40,7 +41,12 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p className="text-sm text-text-muted">{message}</p>
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger">
+          <AlertTriangle size={18} strokeWidth={1.75} />
+        </div>
+        <p className="mt-1.5 text-sm text-text-muted">{message}</p>
+      </div>
     </Modal>
   );
 }

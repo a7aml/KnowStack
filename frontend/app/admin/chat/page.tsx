@@ -2,10 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, Send, Trash2, MessageSquare, MessagesSquare } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { FullPageLoader } from "@/components/ui/FullPageLoader";
+import { Alert } from "@/components/ui/Alert";
+import { Toast } from "@/components/ui/Toast";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { MessageBubble } from "@/components/chat/MessageBubble";
+import { TypingIndicator } from "@/components/chat/TypingIndicator";
 import { adminNavItems } from "@/lib/mock-data";
 import {
   ApiError,
@@ -265,11 +273,7 @@ export default function AdminChatPage() {
   }
 
   if (isChecking || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-muted">
-        <p className="text-sm text-text-muted">Checking your session…</p>
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   const displayName = user.full_name || user.email;
@@ -287,16 +291,21 @@ export default function AdminChatPage() {
         <Card padding="none" className="flex w-64 shrink-0 flex-col overflow-hidden">
           <div className="border-b border-border p-3">
             <Button variant="primary" size="sm" fullWidth type="button" onClick={handleNewChat}>
-              + New chat
+              <Plus size={16} strokeWidth={1.75} />
+              New chat
             </Button>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
             {isLoadingSessions ? (
-              <p className="p-2 text-xs text-text-muted">Loading…</p>
+              <div className="flex flex-col gap-2 p-1">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-11 w-full" />
+                ))}
+              </div>
             ) : sessionsError ? (
               <p className="p-2 text-xs text-danger">{sessionsError}</p>
             ) : sessions.length === 0 ? (
-              <p className="p-2 text-xs text-text-muted">No chats yet.</p>
+              <EmptyState icon={MessageSquare} title="No chats yet" description="Start a new chat to begin." />
             ) : (
               <ul className="flex flex-col gap-1">
                 {sessions.map((s) => (
@@ -304,7 +313,7 @@ export default function AdminChatPage() {
                     <button
                       type="button"
                       onClick={() => selectSession(s.id)}
-                      className={`w-full truncate rounded-md px-3 py-2 pr-8 text-left text-sm transition-colors ${
+                      className={`w-full truncate rounded-md px-3 py-2 pr-8 text-left text-sm transition-colors duration-150 ${
                         s.id === activeSessionId
                           ? "bg-navy-950 text-white"
                           : "text-text-muted hover:bg-surface-sunken hover:text-text"
@@ -327,9 +336,9 @@ export default function AdminChatPage() {
                         setDeleteError(null);
                         setDeleteTarget(s);
                       }}
-                      className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-text-subtle hover:text-danger group-hover:block"
+                      className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1.5 text-text-subtle transition-colors hover:bg-danger-bg hover:text-danger group-hover:block"
                     >
-                      ✕
+                      <Trash2 size={14} strokeWidth={1.75} />
                     </button>
                   </li>
                 ))}
@@ -342,14 +351,21 @@ export default function AdminChatPage() {
           <div ref={scrollRef} className="flex-1 overflow-y-auto p-6">
             {!activeSessionId && messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center">
-                <h2 className="text-lg font-semibold text-navy-950">Ask your knowledge base</h2>
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-navy-50 text-navy-700">
+                  <MessagesSquare size={22} strokeWidth={1.75} />
+                </div>
+                <h2 className="mt-4 text-lg font-semibold text-navy-950">Ask your knowledge base</h2>
                 <p className="mt-2 max-w-sm text-sm text-text-muted">
                   Questions are answered using your organization&apos;s uploaded documents.
                   Start typing below to begin.
                 </p>
               </div>
             ) : isLoadingMessages ? (
-              <p className="text-sm text-text-muted">Loading messages…</p>
+              <div className="flex flex-col gap-4">
+                <Skeleton className="h-14 w-2/3 self-end" />
+                <Skeleton className="h-20 w-3/4" />
+                <Skeleton className="h-14 w-1/2 self-end" />
+              </div>
             ) : messagesError ? (
               <p className="text-sm text-danger">{messagesError}</p>
             ) : messages.length === 0 ? (
@@ -358,38 +374,44 @@ export default function AdminChatPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-4">
-                {messages.map((m) => (
-                  <MessageBubble key={m.id} message={m} />
-                ))}
-                {isSending ? <p className="text-xs text-text-subtle">Generating…</p> : null}
+                {messages.map((m, i) => {
+                  const isLast = i === messages.length - 1;
+                  const isStreamingThis = isSending && isLast && m.role === "assistant";
+                  if (isStreamingThis && m.content === "") {
+                    return <TypingIndicator key={m.id} />;
+                  }
+                  return <MessageBubble key={m.id} message={m} isStreaming={isStreamingThis} />;
+                })}
               </div>
             )}
           </div>
 
           {sendError ? (
-            <div className="border-t border-danger-bg bg-danger-bg px-4 py-2 text-sm text-danger">
-              {sendError}
+            <div className="border-t border-border px-4 py-2">
+              <Alert tone="danger">{sendError}</Alert>
             </div>
           ) : null}
 
           <div className="border-t border-border p-4">
-            <div className="flex items-end gap-3">
+            <div className="flex items-end gap-2 rounded-2xl border border-border-strong bg-surface px-3 py-2 transition-colors focus-within:border-accent focus-within:ring-2 focus-within:ring-accent">
               <textarea
                 value={question}
                 onChange={(e) => setQuestion(e.target.value.slice(0, CHAT_QUESTION_MAX_LENGTH))}
                 onKeyDown={handleKeyDown}
                 disabled={isSending}
-                rows={2}
+                rows={1}
                 placeholder="Ask a question about your documents…"
-                className="flex-1 resize-none rounded-md border border-border-strong bg-surface px-3 py-2.5 text-sm text-text placeholder:text-text-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-60"
+                className="max-h-32 flex-1 resize-none bg-transparent py-1.5 text-sm text-text placeholder:text-text-subtle focus:outline-none disabled:opacity-60"
               />
-              <Button
+              <button
                 type="button"
                 onClick={handleSend}
                 disabled={isSending || !question.trim()}
+                aria-label="Send message"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-navy-900 text-white transition-colors hover:bg-navy-800 disabled:bg-navy-200"
               >
-                {isSending ? "Sending…" : "Send"}
-              </Button>
+                <Send size={15} strokeWidth={1.75} />
+              </button>
             </div>
             <p className="mt-1 text-right text-[11px] text-text-subtle">
               {question.length}/{CHAT_QUESTION_MAX_LENGTH}
@@ -409,43 +431,7 @@ export default function AdminChatPage() {
           if (!isDeleting) setDeleteTarget(null);
         }}
       />
-      {deleteError ? (
-        <p className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md border border-danger-bg bg-danger-bg px-4 py-2 text-sm text-danger shadow-lg">
-          {deleteError}
-        </p>
-      ) : null}
+      <Toast message={deleteError} tone="danger" onDismiss={() => setDeleteError(null)} />
     </DashboardShell>
-  );
-}
-
-function MessageBubble({ message }: { message: ChatMessagePublic }) {
-  const isUser = message.role === "user";
-  return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div className={`max-w-[80%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1.5`}>
-        <div
-          className={`whitespace-pre-wrap rounded-lg px-4 py-2.5 text-sm ${
-            isUser ? "bg-navy-950 text-white" : "bg-surface-sunken text-text"
-          }`}
-        >
-          {message.content || (isUser ? "" : "…")}
-        </div>
-        {!isUser && message.sources && message.sources.length > 0 ? (
-          <div className="w-full rounded-md border border-border bg-surface p-2.5">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-text-subtle">
-              Sources
-            </p>
-            <ul className="mt-1.5 flex flex-col gap-1.5">
-              {message.sources.map((s, i) => (
-                <li key={`${s.document_id}-${s.chunk_index}-${i}`} className="text-xs text-text-muted">
-                  <span className="font-medium text-text">{s.file_name}</span>
-                  <span className="block truncate text-text-subtle">{s.snippet}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </div>
-    </div>
   );
 }

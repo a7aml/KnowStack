@@ -3,9 +3,11 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Lock, Mail } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
 import { ApiError, GOOGLE_LOGIN_URL, login } from "@/lib/apiClient";
 import { isValidEmail } from "@/lib/validation";
 
@@ -19,17 +21,17 @@ function RedirectStatusBanner() {
 
   if (searchParams.get("signup") === "success") {
     return (
-      <p className="mb-6 rounded-md border border-success-bg bg-success-bg px-3 py-2 text-sm text-success">
-        Account created, please log in.
-      </p>
+      <div className="mb-6">
+        <Alert tone="success">Account created, please log in.</Alert>
+      </div>
     );
   }
 
   if (searchParams.get("google_error") === "1") {
     return (
-      <p className="mb-6 rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-        Google sign-in didn&apos;t go through. Please try again.
-      </p>
+      <div className="mb-6">
+        <Alert tone="danger">Google sign-in didn&apos;t go through. Please try again.</Alert>
+      </div>
     );
   }
 
@@ -148,6 +150,7 @@ export default function AdminLoginPage() {
           autoComplete="email"
           placeholder="you@company.com"
           required
+          icon={<Mail size={16} strokeWidth={1.75} />}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           onBlur={() => markTouched("email")}
@@ -160,17 +163,14 @@ export default function AdminLoginPage() {
           autoComplete="current-password"
           placeholder="••••••••"
           required
+          icon={<Lock size={16} strokeWidth={1.75} />}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onBlur={() => markTouched("password")}
           error={touched.password ? (passwordError ?? undefined) : undefined}
         />
 
-        {submitError ? (
-          <p className="rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-            {submitError}
-          </p>
-        ) : null}
+        {submitError ? <Alert tone="danger">{submitError}</Alert> : null}
 
         <Button type="submit" fullWidth disabled={!isFormValid || isSubmitting}>
           {isSubmitting ? "Signing in…" : "Sign in"}

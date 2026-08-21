@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Building2, ImageIcon, Settings as SettingsIcon } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { FullPageLoader } from "@/components/ui/FullPageLoader";
 import { adminNavItems } from "@/lib/mock-data";
 import {
   ApiError,
@@ -179,11 +183,7 @@ export default function OrganizationSettingsPage() {
   }
 
   if (isChecking || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-muted">
-        <p className="text-sm text-text-muted">Checking your session…</p>
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   const displayName = user.full_name || user.email;
@@ -197,50 +197,48 @@ export default function OrganizationSettingsPage() {
       userRole={user.role === "admin" ? "Workspace Admin" : "Employee"}
       userInitials={initialsFor(user.full_name, user.email)}
     >
-      <div className="mx-auto max-w-2xl">
-        <Card padding="lg">
-          <h2 className="text-lg font-semibold text-navy-950">Organization Settings</h2>
-          <p className="mt-1 text-sm text-text-muted">
-            Update your organization&apos;s name and logo.
-          </p>
+      <div className="mx-auto max-w-[1100px]">
+        {isLoadingOrg ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+            <Card padding="md" className="flex flex-col gap-4 lg:col-span-3">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-11 w-full" />
+              <Skeleton className="h-14 w-full" />
+              <Skeleton className="h-10 w-32" />
+            </Card>
+            <Card padding="md" className="flex flex-col gap-4 lg:col-span-2">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-14 w-full" />
+            </Card>
+          </div>
+        ) : loadError ? (
+          <Alert tone="danger">{loadError}</Alert>
+        ) : org ? (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+            <Card padding="md" className="lg:col-span-3">
+              <h2 className="text-lg font-semibold text-navy-950">General</h2>
+              <p className="mt-1 text-sm text-text-muted">
+                Update your organization&apos;s name and logo.
+              </p>
 
-          {isLoadingOrg ? (
-            <p className="mt-6 text-sm text-text-muted">Loading…</p>
-          ) : loadError ? (
-            <p className="mt-6 rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-              {loadError}
-            </p>
-          ) : org ? (
-            <form onSubmit={handleSubmit} noValidate className="mt-6 flex flex-col gap-5">
-              <Input
-                label="Organization name"
-                type="text"
-                name="orgName"
-                maxLength={NAME_MAX_LENGTH}
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                onBlur={() => setNameTouched(true)}
-                error={nameTouched ? (nameError ?? undefined) : undefined}
-              />
+              <form onSubmit={handleSubmit} noValidate className="mt-5 flex flex-col gap-4">
+                <Input
+                  label="Organization name"
+                  type="text"
+                  name="orgName"
+                  maxLength={NAME_MAX_LENGTH}
+                  required
+                  icon={<Building2 size={16} strokeWidth={1.75} />}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  onBlur={() => setNameTouched(true)}
+                  error={nameTouched ? (nameError ?? undefined) : undefined}
+                />
 
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="logo" className="text-sm font-medium text-text">
-                  Logo <span className="font-normal text-text-subtle">(optional)</span>
-                </label>
-                <div className="flex items-center gap-4">
-                  {logoPreview ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- data: URL, not an optimizable remote asset
-                    <img
-                      src={logoPreview}
-                      alt="Organization logo"
-                      className="h-14 w-14 rounded-md border border-border object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-14 w-14 items-center justify-center rounded-md border border-dashed border-border text-xs text-text-subtle">
-                      No logo
-                    </div>
-                  )}
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="logo" className="text-sm font-medium text-text">
+                    Logo <span className="font-normal text-text-subtle">(optional)</span>
+                  </label>
                   <input
                     id="logo"
                     type="file"
@@ -248,36 +246,52 @@ export default function OrganizationSettingsPage() {
                     onChange={handleLogoChange}
                     className="text-sm text-text-muted file:mr-3 file:rounded-md file:border file:border-border-strong file:bg-surface file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-text hover:file:bg-surface-sunken"
                   />
+                  {logoError ? (
+                    <p className="text-xs text-danger">{logoError}</p>
+                  ) : (
+                    <p className="text-xs text-text-muted">PNG or JPG, up to 500KB.</p>
+                  )}
                 </div>
-                {logoError ? (
-                  <p className="text-xs text-danger">{logoError}</p>
-                ) : (
-                  <p className="text-xs text-text-muted">PNG or JPG, up to 500KB.</p>
-                )}
-              </div>
 
-              <div className="flex justify-between gap-4 border-t border-border pt-4 text-sm">
-                <span className="text-text-muted">Organization created</span>
+                {saveError ? <Alert tone="danger">{saveError}</Alert> : null}
+                {saveSuccess ? <Alert tone="success">{saveSuccess}</Alert> : null}
+
+                <Button type="submit" disabled={!canSave || isSaving} className="self-start">
+                  {isSaving ? "Saving…" : "Save changes"}
+                </Button>
+              </form>
+            </Card>
+
+            <Card padding="md" className="flex flex-col gap-4 lg:col-span-2">
+              <h2 className="text-lg font-semibold text-navy-950">Organization</h2>
+              <div className="flex items-center gap-3">
+                {logoPreview ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- data: URL, not an optimizable remote asset
+                  <img
+                    src={logoPreview}
+                    alt="Organization logo"
+                    className="h-14 w-14 shrink-0 rounded-md border border-border object-cover"
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md border border-dashed border-border text-text-subtle">
+                    <ImageIcon size={16} strokeWidth={1.75} />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-text">{name.trim() || org.name}</p>
+                  <p className="flex items-center gap-1 text-xs text-text-subtle">
+                    <SettingsIcon size={12} strokeWidth={1.75} />
+                    Workspace
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-between gap-4 border-t border-border pt-3 text-sm">
+                <span className="text-text-muted">Created</span>
                 <span className="font-medium text-text">{formatDate(org.created_at)}</span>
               </div>
-
-              {saveError ? (
-                <p className="rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-                  {saveError}
-                </p>
-              ) : null}
-              {saveSuccess ? (
-                <p className="rounded-md border border-success-bg bg-success-bg px-3 py-2 text-sm text-success">
-                  {saveSuccess}
-                </p>
-              ) : null}
-
-              <Button type="submit" disabled={!canSave || isSaving}>
-                {isSaving ? "Saving…" : "Save changes"}
-              </Button>
-            </form>
-          ) : null}
-        </Card>
+            </Card>
+          </div>
+        ) : null}
       </div>
     </DashboardShell>
   );

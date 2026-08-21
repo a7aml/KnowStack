@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { LucideIcon } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/lib/utils";
 
@@ -6,6 +8,7 @@ interface NavItem {
   label: string;
   href: string;
   enabled: boolean;
+  icon: LucideIcon;
 }
 
 interface SidebarProps {
@@ -37,9 +40,10 @@ export function Sidebar({
           <Logo />
         </div>
 
-        <nav className="flex flex-col gap-1 p-3">
+        <nav className="flex flex-col gap-0.5 p-3">
           {navItems.map((item) => {
             const isActive = item.href === activeHref;
+            const Icon = item.icon;
 
             if (!item.enabled) {
               return (
@@ -48,7 +52,10 @@ export function Sidebar({
                   className="flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium text-text-subtle"
                   aria-disabled="true"
                 >
-                  {item.label}
+                  <span className="flex items-center gap-2.5">
+                    <Icon size={17} strokeWidth={1.75} />
+                    {item.label}
+                  </span>
                   <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-subtle">
                     Soon
                   </span>
@@ -61,12 +68,13 @@ export function Sidebar({
                 key={item.label}
                 href={item.href}
                 className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
                   isActive
                     ? "bg-navy-950 text-white"
                     : "text-text-muted hover:bg-surface-sunken hover:text-text"
                 )}
               >
+                <Icon size={17} strokeWidth={1.75} className="shrink-0" />
                 {item.label}
               </Link>
             );
@@ -88,8 +96,9 @@ export function Sidebar({
         </div>
         <Link
           href="/"
-          className="mt-4 block rounded-md border border-border-strong px-3 py-2 text-center text-sm font-medium text-text-muted hover:bg-surface-sunken"
+          className="mt-4 flex items-center justify-center gap-2 rounded-md border border-border-strong px-3 py-2 text-center text-sm font-medium text-text-muted transition-colors hover:bg-surface-sunken"
         >
+          <LogOut size={16} strokeWidth={1.75} />
           Log out
         </Link>
       </div>

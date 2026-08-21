@@ -3,9 +3,12 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Lock, Mail, User } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
+import { FullPageLoader } from "@/components/ui/FullPageLoader";
 import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { ApiError, acceptInvite, validateInviteToken } from "@/lib/apiClient";
 import { isPasswordValid, isRequiredWithMax, NAME_MAX_LENGTH } from "@/lib/validation";
@@ -48,9 +51,7 @@ function InvalidInviteCard({ message }: { message: string }) {
         </>
       }
     >
-      <p className="rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-        {message}
-      </p>
+      <Alert tone="danger">{message}</Alert>
     </AuthShell>
   );
 }
@@ -157,11 +158,7 @@ function AcceptInviteContent() {
   }
 
   if (isChecking) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-muted">
-        <p className="text-sm text-text-muted">Checking your invitation…</p>
-      </div>
-    );
+    return <FullPageLoader label="Checking your invitation…" />;
   }
 
   if (invalidMessage) {
@@ -193,7 +190,12 @@ function AcceptInviteContent() {
         <p className="text-sm text-text">
           You&apos;ve been invited{organizationName ? ` by ${organizationName}` : ""}
         </p>
-        {email ? <p className="mt-0.5 text-xs text-text-muted">Invited email: {email}</p> : null}
+        {email ? (
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-text-muted">
+            <Mail size={13} strokeWidth={1.75} />
+            {email}
+          </p>
+        ) : null}
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
@@ -205,6 +207,7 @@ function AcceptInviteContent() {
           placeholder="Sam Whitfield"
           maxLength={NAME_MAX_LENGTH}
           required
+          icon={<User size={16} strokeWidth={1.75} />}
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           onBlur={() => markTouched("fullName")}
@@ -218,6 +221,7 @@ function AcceptInviteContent() {
             autoComplete="new-password"
             placeholder="••••••••"
             required
+            icon={<Lock size={16} strokeWidth={1.75} />}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onBlur={() => markTouched("password")}
@@ -232,17 +236,14 @@ function AcceptInviteContent() {
           autoComplete="new-password"
           placeholder="••••••••"
           required
+          icon={<Lock size={16} strokeWidth={1.75} />}
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           onBlur={() => markTouched("confirmPassword")}
           error={touched.confirmPassword ? (confirmPasswordError ?? undefined) : undefined}
         />
 
-        {submitError ? (
-          <p className="rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-            {submitError}
-          </p>
-        ) : null}
+        {submitError ? <Alert tone="danger">{submitError}</Alert> : null}
 
         <Button type="submit" fullWidth disabled={!isFormValid || isSubmitting}>
           {isSubmitting ? "Creating account…" : "Accept invite & create account"}
@@ -254,13 +255,7 @@ function AcceptInviteContent() {
 
 export default function AcceptInvitePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-surface-muted">
-          <p className="text-sm text-text-muted">Loading…</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<FullPageLoader label="Loading…" />}>
       <AcceptInviteContent />
     </Suspense>
   );

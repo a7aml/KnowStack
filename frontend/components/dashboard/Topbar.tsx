@@ -1,3 +1,5 @@
+import { Menu } from "lucide-react";
+
 interface TopbarProps {
   title: string;
   onMenuClick: () => void;
@@ -10,25 +12,12 @@ export function Topbar({ title, onMenuClick }: TopbarProps) {
         type="button"
         onClick={onMenuClick}
         aria-label="Toggle navigation menu"
-        className="flex h-9 w-9 items-center justify-center rounded-md border border-border-strong text-text-muted hover:bg-surface-sunken lg:hidden"
+        className="flex h-9 w-9 items-center justify-center rounded-md border border-border-strong text-text-muted transition-colors hover:bg-surface-sunken lg:hidden"
       >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 18 18"
-          fill="none"
-          aria-hidden="true"
-        >
-          <path
-            d="M2 4.5H16M2 9H16M2 13.5H16"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        <Menu size={18} strokeWidth={1.75} />
       </button>
 
-      <h1 className="text-base font-semibold text-navy-950">{title}</h1>
+      <h1 className="text-xl font-semibold tracking-tight text-navy-950">{title}</h1>
     </header>
   );
 }

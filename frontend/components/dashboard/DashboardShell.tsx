@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Topbar } from "@/components/dashboard/Topbar";
 import { cn } from "@/lib/utils";
@@ -10,6 +11,7 @@ interface NavItem {
   label: string;
   href: string;
   enabled: boolean;
+  icon: LucideIcon;
 }
 
 interface DashboardShellProps {
@@ -52,10 +54,10 @@ export function DashboardShell({
           <button
             type="button"
             aria-label="Close navigation menu"
-            className="fixed inset-0 bg-navy-950/40"
+            className="fixed inset-0 bg-navy-950/40 animate-fade-in"
             onClick={() => setMobileNavOpen(false)}
           />
-          <Sidebar {...sidebarProps} className={cn("relative z-50 flex")} />
+          <Sidebar {...sidebarProps} className={cn("relative z-50 flex animate-slide-in-left")} />
         </div>
       )}
 
@@ -65,7 +67,7 @@ export function DashboardShell({
           onMenuClick={() => setMobileNavOpen((open) => !open)}
         />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {children}
+          <div className="animate-fade-in-up">{children}</div>
         </main>
       </div>
     </div>

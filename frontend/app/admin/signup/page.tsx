@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Building2, Lock, Mail, User } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
 import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
 import { ApiError, GOOGLE_LOGIN_URL, signupAdmin } from "@/lib/apiClient";
 import { isPasswordValid, isRequiredWithMax, isValidEmail, NAME_MAX_LENGTH } from "@/lib/validation";
@@ -165,6 +167,7 @@ export default function AdminSignupPage() {
           placeholder="Jordan Reyes"
           maxLength={NAME_MAX_LENGTH}
           required
+          icon={<User size={16} strokeWidth={1.75} />}
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           onBlur={() => markTouched("fullName")}
@@ -177,6 +180,7 @@ export default function AdminSignupPage() {
           placeholder="Acme Industries"
           maxLength={NAME_MAX_LENGTH}
           required
+          icon={<Building2 size={16} strokeWidth={1.75} />}
           value={orgName}
           onChange={(e) => setOrgName(e.target.value)}
           onBlur={() => markTouched("orgName")}
@@ -189,6 +193,7 @@ export default function AdminSignupPage() {
           autoComplete="email"
           placeholder="you@company.com"
           required
+          icon={<Mail size={16} strokeWidth={1.75} />}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           onBlur={() => markTouched("email")}
@@ -202,6 +207,7 @@ export default function AdminSignupPage() {
             autoComplete="new-password"
             placeholder="••••••••"
             required
+            icon={<Lock size={16} strokeWidth={1.75} />}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onBlur={() => markTouched("password")}
@@ -216,17 +222,14 @@ export default function AdminSignupPage() {
           autoComplete="new-password"
           placeholder="••••••••"
           required
+          icon={<Lock size={16} strokeWidth={1.75} />}
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           onBlur={() => markTouched("confirmPassword")}
           error={touched.confirmPassword ? (confirmPasswordError ?? undefined) : undefined}
         />
 
-        {submitError ? (
-          <p className="rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-            {submitError}
-          </p>
-        ) : null}
+        {submitError ? <Alert tone="danger">{submitError}</Alert> : null}
 
         <Button type="submit" fullWidth disabled={!isFormValid || isSubmitting}>
           {isSubmitting ? "Creating account…" : "Create admin account"}

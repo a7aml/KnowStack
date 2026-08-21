@@ -9,7 +9,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/utils";
 import type { ActivityPoint, ActivityRange } from "@/lib/apiClient";
 
@@ -50,7 +52,10 @@ export function ActivityChart({ points, range, onRangeChange, isLoading }: Activ
   return (
     <Card padding="lg">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-navy-950">Activity</h2>
+        <h2 className="flex items-center gap-2 text-lg font-semibold text-navy-950">
+          <TrendingUp size={18} strokeWidth={1.75} className="text-text-subtle" />
+          Activity
+        </h2>
         <div className="flex gap-1 rounded-md border border-border p-1">
           {RANGE_OPTIONS.map((opt) => (
             <button
@@ -58,7 +63,7 @@ export function ActivityChart({ points, range, onRangeChange, isLoading }: Activ
               type="button"
               onClick={() => onRangeChange(opt.value)}
               className={cn(
-                "rounded px-2.5 py-1 text-xs font-medium transition-colors",
+                "rounded px-2.5 py-1 text-xs font-medium transition-colors duration-150",
                 opt.value === range
                   ? "bg-navy-950 text-white"
                   : "text-text-muted hover:bg-surface-sunken"
@@ -72,9 +77,7 @@ export function ActivityChart({ points, range, onRangeChange, isLoading }: Activ
 
       <div className="mt-4 h-64">
         {isLoading ? (
-          <div className="flex h-full items-center justify-center text-sm text-text-muted">
-            Loading…
-          </div>
+          <Skeleton className="h-full w-full" />
         ) : !hasActivity ? (
           <div className="flex h-full items-center justify-center text-sm text-text-muted">
             No activity recorded in this range.

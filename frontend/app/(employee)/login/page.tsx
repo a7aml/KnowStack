@@ -3,9 +3,11 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { Lock, Mail } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Alert } from "@/components/ui/Alert";
 import { ApiError, employeeLogin } from "@/lib/apiClient";
 import { isValidEmail } from "@/lib/validation";
 
@@ -19,9 +21,9 @@ function RedirectStatusBanner() {
 
   if (searchParams.get("accepted") === "success") {
     return (
-      <p className="mb-6 rounded-md border border-success-bg bg-success-bg px-3 py-2 text-sm text-success">
-        Account created, please log in.
-      </p>
+      <div className="mb-6">
+        <Alert tone="success">Account created, please log in.</Alert>
+      </div>
     );
   }
 
@@ -103,6 +105,7 @@ export default function EmployeeLoginPage() {
           autoComplete="email"
           placeholder="you@company.com"
           required
+          icon={<Mail size={16} strokeWidth={1.75} />}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           onBlur={() => markTouched("email")}
@@ -115,17 +118,14 @@ export default function EmployeeLoginPage() {
           autoComplete="current-password"
           placeholder="••••••••"
           required
+          icon={<Lock size={16} strokeWidth={1.75} />}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onBlur={() => markTouched("password")}
           error={touched.password ? (passwordError ?? undefined) : undefined}
         />
 
-        {submitError ? (
-          <p className="rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-            {submitError}
-          </p>
-        ) : null}
+        {submitError ? <Alert tone="danger">{submitError}</Alert> : null}
 
         <Button type="submit" fullWidth disabled={!isFormValid || isSubmitting}>
           {isSubmitting ? "Signing in…" : "Sign in"}

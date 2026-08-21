@@ -2,11 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Mail,
+  Power,
+  RotateCcw,
+  Search,
+  Trash2,
+  UserPlus,
+  Users as UsersIcon,
+  XCircle,
+} from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Alert } from "@/components/ui/Alert";
+import { Toast } from "@/components/ui/Toast";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { SkeletonTable } from "@/components/ui/Skeleton";
+import { FullPageLoader } from "@/components/ui/FullPageLoader";
 import { Table, TableHeadRow, Th, Td, Tr } from "@/components/ui/Table";
 import { Modal } from "@/components/ui/Modal";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -280,11 +298,7 @@ export default function AdminUsersPage() {
   }
 
   if (isChecking || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-muted">
-        <p className="text-sm text-text-muted">Checking your session…</p>
-      </div>
-    );
+    return <FullPageLoader />;
   }
 
   const displayName = user.full_name || user.email;
@@ -299,20 +313,24 @@ export default function AdminUsersPage() {
       userRole={user.role === "admin" ? "Workspace Admin" : "Employee"}
       userInitials={initialsFor(user.full_name, user.email)}
     >
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
-        <Card padding="lg">
-          <h2 className="text-lg font-semibold text-navy-950">Invite an employee</h2>
+      <div className="mx-auto flex max-w-[1100px] flex-col gap-6">
+        <Card padding="md">
+          <h2 className="flex items-center gap-2 text-lg font-semibold text-navy-950">
+            <UserPlus size={18} strokeWidth={1.75} className="text-text-subtle" />
+            Invite an employee
+          </h2>
           <p className="mt-1 text-sm text-text-muted">
             Invites are sent one at a time and expire after 3 days if not accepted.
           </p>
 
-          <form onSubmit={handleInviteSubmit} noValidate className="mt-5 flex items-start gap-3">
+          <form onSubmit={handleInviteSubmit} noValidate className="mt-4 flex items-start gap-3">
             <div className="flex-1">
               <Input
                 label="Work email"
                 type="email"
                 name="inviteEmail"
                 placeholder="employee@company.com"
+                icon={<Mail size={16} strokeWidth={1.75} />}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 error={emailError ?? undefined}
@@ -326,14 +344,14 @@ export default function AdminUsersPage() {
           </form>
 
           {inviteError ? (
-            <p className="mt-4 rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-              {inviteError}
-            </p>
+            <div className="mt-4">
+              <Alert tone="danger">{inviteError}</Alert>
+            </div>
           ) : null}
           {inviteSuccess ? (
-            <p className="mt-4 rounded-md border border-success-bg bg-success-bg px-3 py-2 text-sm text-success">
-              {inviteSuccess}
-            </p>
+            <div className="mt-4">
+              <Alert tone="success">{inviteSuccess}</Alert>
+            </div>
           ) : null}
         </Card>
 
@@ -341,27 +359,31 @@ export default function AdminUsersPage() {
           <h2 className="text-lg font-semibold text-navy-950">Invites</h2>
 
           {actionError ? (
-            <p className="mt-3 rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-              {actionError}
-            </p>
+            <div className="mt-3">
+              <Alert tone="danger">{actionError}</Alert>
+            </div>
           ) : null}
 
           {isLoadingInvites ? (
-            <p className="mt-4 text-sm text-text-muted">Loading invites…</p>
+            <div className="mt-4">
+              <SkeletonTable rows={4} columns={5} />
+            </div>
           ) : listError ? (
-            <p className="mt-4 text-sm text-danger">{listError}</p>
+            <div className="mt-4">
+              <Alert tone="danger">{listError}</Alert>
+            </div>
           ) : invites.length === 0 ? (
-            <p className="mt-4 text-sm text-text-muted">No invites yet.</p>
+            <EmptyState icon={Mail} title="No invites yet" />
           ) : (
             <div className="mt-4">
               <Table>
                 <thead>
                   <TableHeadRow>
                     <Th>Email</Th>
-                    <Th>Status</Th>
-                    <Th>Invited</Th>
-                    <Th>Expires</Th>
-                    <Th>Actions</Th>
+                    <Th className="w-28">Status</Th>
+                    <Th className="w-32">Invited</Th>
+                    <Th className="w-32">Expires</Th>
+                    <Th className="w-48">Actions</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody>
@@ -387,6 +409,7 @@ export default function AdminUsersPage() {
                                 disabled={isBusy}
                                 onClick={() => handleResend(invite.id)}
                               >
+                                <RotateCcw size={13} strokeWidth={1.75} />
                                 {isBusy ? "…" : "Resend"}
                               </Button>
                             ) : null}
@@ -398,6 +421,7 @@ export default function AdminUsersPage() {
                                 disabled={isBusy}
                                 onClick={() => handleRevoke(invite.id)}
                               >
+                                <XCircle size={13} strokeWidth={1.75} />
                                 {isBusy ? "…" : "Revoke"}
                               </Button>
                             ) : null}
@@ -415,7 +439,10 @@ export default function AdminUsersPage() {
         <Card padding="lg">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h2 className="text-lg font-semibold text-navy-950">All users</h2>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-navy-950">
+                <UsersIcon size={18} strokeWidth={1.75} className="text-text-subtle" />
+                All users
+              </h2>
               <p className="mt-1 text-sm text-text-muted">
                 Everyone in {user.organization_name ?? "your organization"} — admins and employees.
               </p>
@@ -427,6 +454,7 @@ export default function AdminUsersPage() {
                   type="search"
                   name="userSearch"
                   placeholder="Name or email"
+                  icon={<Search size={16} strokeWidth={1.75} />}
                   value={usersSearchInput}
                   onChange={(e) => handleSearchInputChange(e.target.value)}
                 />
@@ -439,7 +467,7 @@ export default function AdminUsersPage() {
                   id="statusFilter"
                   value={usersStatusFilter}
                   onChange={(e) => handleStatusFilterChange(e.target.value)}
-                  className="rounded-md border border-border-strong bg-surface px-3 py-2.5 text-sm text-text focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
+                  className="rounded-md border border-border-strong bg-surface px-3 py-2.5 text-sm text-text transition-[border-color,box-shadow] duration-150 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent"
                 >
                   <option value="">All</option>
                   <option value="active">Active</option>
@@ -450,29 +478,33 @@ export default function AdminUsersPage() {
           </div>
 
           {userActionError ? (
-            <p className="mt-4 rounded-md border border-danger-bg bg-danger-bg px-3 py-2 text-sm text-danger">
-              {userActionError}
-            </p>
+            <div className="mt-4">
+              <Alert tone="danger">{userActionError}</Alert>
+            </div>
           ) : null}
 
           {isLoadingUsers ? (
-            <p className="mt-4 text-sm text-text-muted">Loading users…</p>
+            <div className="mt-4">
+              <SkeletonTable rows={5} columns={6} />
+            </div>
           ) : usersListError ? (
-            <p className="mt-4 text-sm text-danger">{usersListError}</p>
+            <div className="mt-4">
+              <Alert tone="danger">{usersListError}</Alert>
+            </div>
           ) : users.length === 0 ? (
-            <p className="mt-4 text-sm text-text-muted">No users match your filters.</p>
+            <EmptyState icon={UsersIcon} title="No users match your filters" />
           ) : (
             <>
               <div className="mt-4">
                 <Table minWidth="640px">
                   <thead>
                     <TableHeadRow>
-                      <Th>Name</Th>
-                      <Th>Email</Th>
-                      <Th>Role</Th>
-                      <Th>Status</Th>
-                      <Th>Joined</Th>
-                      <Th>Actions</Th>
+                      <Th className="w-1/4">Name</Th>
+                      <Th className="w-1/4">Email</Th>
+                      <Th className="w-24">Role</Th>
+                      <Th className="w-28">Status</Th>
+                      <Th className="w-28">Joined</Th>
+                      <Th className="w-56">Actions</Th>
                     </TableHeadRow>
                   </thead>
                   <tbody>
@@ -498,6 +530,7 @@ export default function AdminUsersPage() {
                                 type="button"
                                 onClick={() => setDetailUser(row)}
                               >
+                                <Eye size={13} strokeWidth={1.75} />
                                 View
                               </Button>
                               {!isSelf && canToggle ? (
@@ -508,6 +541,7 @@ export default function AdminUsersPage() {
                                   disabled={isBusy}
                                   onClick={() => handleToggleStatus(row)}
                                 >
+                                  <Power size={13} strokeWidth={1.75} />
                                   {isBusy ? "…" : row.status === "active" ? "Disable" : "Enable"}
                                 </Button>
                               ) : null}
@@ -522,6 +556,7 @@ export default function AdminUsersPage() {
                                     setDeleteTarget(row);
                                   }}
                                 >
+                                  <Trash2 size={13} strokeWidth={1.75} />
                                   Delete
                                 </Button>
                               ) : null}
@@ -546,6 +581,7 @@ export default function AdminUsersPage() {
                     disabled={usersPage <= 1}
                     onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
                   >
+                    <ChevronLeft size={14} strokeWidth={1.75} />
                     Previous
                   </Button>
                   <span className="text-xs text-text-muted">
@@ -559,6 +595,7 @@ export default function AdminUsersPage() {
                     onClick={() => setUsersPage((p) => Math.min(totalPages, p + 1))}
                   >
                     Next
+                    <ChevronRight size={14} strokeWidth={1.75} />
                   </Button>
                 </div>
               </div>
@@ -620,11 +657,7 @@ export default function AdminUsersPage() {
           if (!isDeleting) setDeleteTarget(null);
         }}
       />
-      {deleteError ? (
-        <p className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md border border-danger-bg bg-danger-bg px-4 py-2 text-sm text-danger shadow-lg">
-          {deleteError}
-        </p>
-      ) : null}
+      <Toast message={deleteError} tone="danger" onDismiss={() => setDeleteError(null)} />
     </DashboardShell>
   );
 }
