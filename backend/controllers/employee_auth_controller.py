@@ -178,18 +178,15 @@ def accept_invite(db: Session, payload: AcceptInviteRequest) -> str:
 
 
 def employee_signup(db: Session, payload: EmployeeSignupRequest) -> str:
-    """Safety net for /employees/signup being reached without an invite
-    token in the URL: looks up the most recent pending/expired invite for
-    this email (across any organization — the page has no org context) and
-    only proceeds if one exists."""
+    """Signup fallback for users routed to /signup instead of directly to
+    /accept-invite. Still requires the invite token — matching by email
+    alone would let anyone who merely knows (or guesses) an invited
+    address create and take over that person's account before they ever
+    accept their real invite, since an email address isn't proof the
+    caller controls that inbox. The token is what actually proves that."""
     email = payload.email.lower()
-    invite = (
-        db.query(Invite)
-        .filter(Invite.email == email, Invite.status.in_(("pending", "expired")))
-        .order_by(Invite.created_at.desc())
-        .first()
-    )
-    if invite is None:
+    invite = db.query(Invite).filter(Invite.token == payload.token).first()
+    if invite is None or invite.email != email:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=NOT_INVITED_ERROR)
 
     return _accept_invite_core(

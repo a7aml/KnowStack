@@ -1,33 +1,115 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Lock, Mail, User } from "lucide-react";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
+import { FullPageLoader } from "@/components/ui/FullPageLoader";
 import { PasswordStrengthMeter } from "@/components/ui/PasswordStrengthMeter";
-import { ApiError, employeeSignup } from "@/lib/apiClient";
-import { isPasswordValid, isRequiredWithMax, isValidEmail, NAME_MAX_LENGTH } from "@/lib/validation";
+import { ApiError, employeeSignup, validateInviteToken } from "@/lib/apiClient";
+import { isPasswordValid, isRequiredWithMax, NAME_MAX_LENGTH } from "@/lib/validation";
 
-type Field = "fullName" | "email" | "password" | "confirmPassword";
+type Field = "fullName" | "password" | "confirmPassword";
 
-// Reached either via a direct visit (no invite token) or by a user who
-// clicked through from /accept-invite without a token in the URL somehow.
-// Either way, the backend re-checks for a valid pending invite for the
-// entered email before creating anything — this page never trusts a
-// frontend-only assumption that the visitor was actually invited.
-export default function EmployeeSignupPage() {
+const INVALID_INVITE_MESSAGE = "This invite is no longer valid, ask your admin to resend it.";
+
+function reasonToMessage(reason: string | null): string {
+  switch (reason) {
+    case "already_accepted":
+      return "This invite has already been accepted. Please log in instead.";
+    case "not_found":
+    case "expired":
+    case "revoked":
+    default:
+      return INVALID_INVITE_MESSAGE;
+  }
+}
+
+function InvalidInviteCard({ message }: { message: string }) {
+  return (
+    <AuthShell
+      eyebrow="Employee workspace"
+      title="Invite not valid"
+      subtitle="This invitation link can no longer be used."
+      panelHeading="Ask your admin for a new invite."
+      panelBody="Invite links expire after 3 days and can only be used once. Your organization's admin can resend or check the status of your invite from the Users tab."
+      panelPoints={[
+        "Invite links are single-use",
+        "Links expire after 3 days",
+        "Admins can resend from the dashboard",
+      ]}
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-accent hover:text-accent-hover">
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      <Alert tone="danger">{message}</Alert>
+    </AuthShell>
+  );
+}
+
+// This page must be reached with the same ?token= a real invite link
+// carries — an email address alone is never accepted as proof that the
+// visitor controls that inbox. The token is validated up front (like
+// /accept-invite) and re-checked server-side on submit.
+function EmployeeSignupContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
+
+  const [isChecking, setIsChecking] = useState(true);
+  const [invalidMessage, setInvalidMessage] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+  const [organizationName, setOrganizationName] = useState<string | null>(null);
+
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkToken() {
+      if (!token) {
+        if (!cancelled) {
+          setInvalidMessage("This invite link is missing a token. Ask your admin to resend it.");
+          setIsChecking(false);
+        }
+        return;
+      }
+
+      try {
+        const result = await validateInviteToken(token);
+        if (cancelled) return;
+        if (!result.valid) {
+          setInvalidMessage(reasonToMessage(result.reason));
+        } else {
+          setEmail(result.email);
+          setOrganizationName(result.organization_name);
+        }
+      } catch {
+        if (!cancelled) setInvalidMessage(INVALID_INVITE_MESSAGE);
+      } finally {
+        if (!cancelled) setIsChecking(false);
+      }
+    }
+
+    checkToken();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   function markTouched(field: Field) {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -37,12 +119,6 @@ export default function EmployeeSignupPage() {
     ? "Full name is required"
     : !isRequiredWithMax(fullName)
       ? `Must be ${NAME_MAX_LENGTH} characters or fewer`
-      : null;
-
-  const emailError = !email.trim()
-    ? "Work email is required"
-    : !isValidEmail(email)
-      ? "Enter a valid email address"
       : null;
 
   const passwordError = !password
@@ -57,18 +133,19 @@ export default function EmployeeSignupPage() {
       ? "Passwords do not match"
       : null;
 
-  const isFormValid = !fullNameError && !emailError && !passwordError && !confirmPasswordError;
+  const isFormValid = !fullNameError && !passwordError && !confirmPasswordError;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setTouched({ fullName: true, email: true, password: true, confirmPassword: true });
+    setTouched({ fullName: true, password: true, confirmPassword: true });
     setSubmitError(null);
 
-    if (!isFormValid) return;
+    if (!isFormValid || !token || !email) return;
 
     setIsSubmitting(true);
     try {
       await employeeSignup({
+        token,
         email,
         password,
         confirm_password: confirmPassword,
@@ -81,11 +158,19 @@ export default function EmployeeSignupPage() {
     }
   }
 
+  if (isChecking) {
+    return <FullPageLoader label="Checking your invitation…" />;
+  }
+
+  if (invalidMessage) {
+    return <InvalidInviteCard message={invalidMessage} />;
+  }
+
   return (
     <AuthShell
       eyebrow="Employee workspace"
       title="Create your account"
-      subtitle="You'll need a valid invitation from your organization's admin to continue."
+      subtitle="Finish setting up your account to join the workspace."
       panelHeading="You've been invited to join a workspace."
       panelBody="An administrator has added you to their organization's knowledge base. Complete setup to get started."
       panelPoints={[
@@ -102,6 +187,18 @@ export default function EmployeeSignupPage() {
         </>
       }
     >
+      <div className="mb-6 rounded-md border border-border bg-surface-sunken px-4 py-3">
+        <p className="text-sm text-text">
+          You&apos;ve been invited{organizationName ? ` by ${organizationName}` : ""}
+        </p>
+        {email ? (
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-text-muted">
+            <Mail size={13} strokeWidth={1.75} />
+            {email}
+          </p>
+        ) : null}
+      </div>
+
       <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-5">
         <Input
           label="Full name"
@@ -116,19 +213,6 @@ export default function EmployeeSignupPage() {
           onChange={(e) => setFullName(e.target.value)}
           onBlur={() => markTouched("fullName")}
           error={touched.fullName ? (fullNameError ?? undefined) : undefined}
-        />
-        <Input
-          label="Work email"
-          type="email"
-          name="email"
-          autoComplete="email"
-          placeholder="you@company.com"
-          required
-          icon={<Mail size={16} strokeWidth={1.75} />}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onBlur={() => markTouched("email")}
-          error={touched.email ? (emailError ?? undefined) : undefined}
         />
         <div className="flex flex-col gap-2">
           <Input
@@ -167,5 +251,13 @@ export default function EmployeeSignupPage() {
         </Button>
       </form>
     </AuthShell>
+  );
+}
+
+export default function EmployeeSignupPage() {
+  return (
+    <Suspense fallback={<FullPageLoader label="Loading…" />}>
+      <EmployeeSignupContent />
+    </Suspense>
   );
 }

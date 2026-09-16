@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from config.database import get_db
 from controllers import chat_controller
 from middleware.auth_middleware import AuthContext, get_current_user
-from middleware.rate_limit_middleware import InMemoryWindowLimiter, limiter
+from middleware.rate_limit_middleware import RedisWindowLimiter, limiter
 from schemas.chat_schema import (
     ChatMessageListResponse,
     ChatMessagePublic,
@@ -32,10 +32,10 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 # Per-user and per-org budgets on top of the per-IP @limiter.limit decorator
 # below — this is the one endpoint in the app that spends real money per
 # call (an embedding + a gpt-4o-mini completion), so it gets its own,
-# tighter limits than the generic per-IP one. Same InMemoryWindowLimiter
+# tighter limits than the generic per-IP one. Same RedisWindowLimiter
 # pattern as employee_routes.py / document_routes.py.
-_message_user_limiter = InMemoryWindowLimiter()
-_message_org_limiter = InMemoryWindowLimiter()
+_message_user_limiter = RedisWindowLimiter()
+_message_org_limiter = RedisWindowLimiter()
 
 
 @router.post("/sessions", response_model=ChatSessionActionResponse, status_code=201)

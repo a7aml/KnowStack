@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from config.database import get_db
 from controllers import document_controller
 from middleware.auth_middleware import AuthContext, require_admin
-from middleware.rate_limit_middleware import InMemoryWindowLimiter, limiter
+from middleware.rate_limit_middleware import RedisWindowLimiter, limiter
 from schemas.document_schema import (
     DocumentActionResponse,
     DocumentListResponse,
@@ -26,9 +26,9 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 # Per-org limits on top of the per-IP @limiter.limit decorators below — an
 # admin uploading from multiple IPs (or many admins in one org) shouldn't be
 # able to exceed a per-org budget that's really about controlling OpenAI
-# embedding spend. Same InMemoryWindowLimiter pattern as employee_routes.py.
-_upload_limiter = InMemoryWindowLimiter()
-_delete_limiter = InMemoryWindowLimiter()
+# embedding spend. Same RedisWindowLimiter pattern as employee_routes.py.
+_upload_limiter = RedisWindowLimiter()
+_delete_limiter = RedisWindowLimiter()
 
 
 @router.post("/upload", response_model=DocumentUploadResponse, status_code=202)

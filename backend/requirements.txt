@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+gunicorn
 supabase
 openai
 pydantic
@@ -17,7 +18,11 @@ pyjwt
 slowapi
 resend
 celery
-redis
+# Pinned <6: redis-py 6+ defaults to RESP3 (sends HELLO on connect), which
+# older/local Redis builds (e.g. the Windows Redis service used in dev,
+# 5.0.14) don't support and reject with "unknown command HELLO", breaking
+# both the rate limiter and the Celery broker/backend connection.
+redis==5.0.1
 pypdf
 python-docx
 tiktoken

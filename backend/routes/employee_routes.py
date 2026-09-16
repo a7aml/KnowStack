@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from config.database import get_db
 from controllers import employee_controller
 from middleware.auth_middleware import AuthContext, require_admin
-from middleware.rate_limit_middleware import InMemoryWindowLimiter, limiter
+from middleware.rate_limit_middleware import RedisWindowLimiter, limiter
 from schemas.employee_schema import (
     EmployeeListResponse,
     EmployeeUserPublic,
@@ -29,13 +29,13 @@ router = APIRouter(prefix="/employees", tags=["employees"])
 # Per-org limit on top of the per-IP @limiter.limit decorators below — an
 # admin hammering the invite endpoint from one IP for one org shouldn't be
 # able to spam a mailbox just because slowapi's IP-based limit is generous
-# enough to allow it. Same InMemoryWindowLimiter class auth_routes.py uses
+# enough to allow it. Same RedisWindowLimiter class auth_routes.py uses
 # for per-email login attempts.
-_invite_action_limiter = InMemoryWindowLimiter()
+_invite_action_limiter = RedisWindowLimiter()
 
 # Same pattern, separate bucket: enable/disable/delete are a different kind
 # of action from sending invite emails and shouldn't share one budget.
-_user_management_limiter = InMemoryWindowLimiter()
+_user_management_limiter = RedisWindowLimiter()
 
 
 @router.post("/invite", response_model=InviteActionResponse, status_code=201)

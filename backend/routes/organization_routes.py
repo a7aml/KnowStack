@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from config.database import get_db
 from controllers import organization_controller
 from middleware.auth_middleware import AuthContext, require_admin
-from middleware.rate_limit_middleware import InMemoryWindowLimiter, limiter
+from middleware.rate_limit_middleware import RedisWindowLimiter, limiter
 from schemas.organization_schema import (
     OrganizationActionResponse,
     OrganizationPublic,
@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/organization", tags=["organization"])
 
-# Same InMemoryWindowLimiter pattern as employee_routes.py's per-org invite
+# Same RedisWindowLimiter pattern as employee_routes.py's per-org invite
 # and user-management limits — separate bucket for this endpoint.
-_organization_update_limiter = InMemoryWindowLimiter()
+_organization_update_limiter = RedisWindowLimiter()
 
 
 @router.get("", response_model=OrganizationPublic)

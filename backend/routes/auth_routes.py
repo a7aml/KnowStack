@@ -33,7 +33,11 @@ def _set_access_cookie(response: Response, access_token: str) -> None:
         max_age=settings.access_token_expire_minutes * 60,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="strict",
+        # None: the frontend (Vercel) and this API (Railway) are different
+        # sites, and a Lax/Strict cookie is never attached to a cross-site
+        # fetch/XHR request no matter what CORS allows. Requires Secure=True
+        # to be accepted by the browser at all — see settings.cookie_secure.
+        samesite="none",
         path="/",
     )
 
@@ -45,7 +49,8 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
         max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="strict",
+        # None — see _set_access_cookie above.
+        samesite="none",
         # Scoped to /auth: this cookie is only ever needed by /auth/refresh
         # and /auth/logout, so it's never sent on ordinary API requests.
         path="/auth",
@@ -59,13 +64,13 @@ def _set_google_verifier_cookie(response: Response, code_verifier: str) -> None:
         max_age=auth_service.GOOGLE_OAUTH_VERIFIER_MAX_AGE_SECONDS,
         httponly=True,
         secure=settings.cookie_secure,
-        # Not "strict": this cookie must be sent when Google/Supabase
-        # redirects the browser back to our callback — a top-level
-        # navigation arriving FROM another site, which SameSite=Strict
-        # cookies are never attached to. "Lax" still blocks it from being
-        # sent on any cross-site subresource/XHR request, just not this
-        # top-level GET redirect.
-        samesite="lax",
+        # None — see _set_access_cookie above. This one arguably only ever
+        # needed "Lax" (it's set and read on this same backend domain; the
+        # only cross-site hop is the top-level redirect through Google,
+        # which Lax already allows), but SameSite=None is a strict superset
+        # of what Lax permits, so it's still correct here — just more
+        # permissive than this particular cookie strictly requires.
+        samesite="none",
         path="/auth/google",
     )
 
@@ -77,7 +82,11 @@ def _set_onboarding_cookie(response: Response, onboarding_token: str) -> None:
         max_age=auth_service.ONBOARDING_TOKEN_EXPIRE_MINUTES * 60,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="strict",
+        # None — see _set_access_cookie above. This one is set here on a
+        # redirect to the frontend's onboarding page, but then read back via
+        # cross-site fetch calls from that page (GET /auth/onboarding/status,
+        # POST /auth/onboarding/organization), so it needs this too.
+        samesite="none",
         path="/auth",
     )
 

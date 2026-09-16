@@ -13,12 +13,13 @@ frontend/build/
 frontend/.turbo/
 
 # --- Env files ---
-.env
-.env.local
-.env.*.local
-backend/.env
-frontend/.env
-frontend/.env.local
+# Catch-all: ignores .env, .env.local, .env.production, .env.development,
+# .env.*.local, etc. at any depth (backend/, frontend/, or root) — a bare
+# pattern with no leading slash matches at every directory level. The
+# explicit exception keeps committed example/template files trackable.
+.env*
+!.env.example
+!**/.env.example
 
 # --- Editors / OS ---
 .vscode/

@@ -11,7 +11,7 @@ from config.database import get_db
 from config.settings import settings
 from controllers import employee_auth_controller
 from middleware.auth_middleware import ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE
-from middleware.rate_limit_middleware import InMemoryWindowLimiter, limiter
+from middleware.rate_limit_middleware import RedisWindowLimiter, limiter
 from schemas.employee_schema import (
     AcceptInviteRequest,
     AcceptInviteResponse,
@@ -28,8 +28,8 @@ router = APIRouter(prefix="/employees", tags=["employee-auth"])
 # Same shape as auth_routes.py's login_email_limiter — kept as a separate
 # instance here since this file only imports the class, not that module's
 # shared instance, to stay within the auth-routes-are-out-of-scope boundary.
-_employee_login_email_limiter = InMemoryWindowLimiter()
-_accept_invite_limiter = InMemoryWindowLimiter()
+_employee_login_email_limiter = RedisWindowLimiter()
+_accept_invite_limiter = RedisWindowLimiter()
 
 
 def _set_access_cookie(response: Response, access_token: str) -> None:
@@ -39,7 +39,11 @@ def _set_access_cookie(response: Response, access_token: str) -> None:
         max_age=settings.access_token_expire_minutes * 60,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="strict",
+        # None: the frontend (Vercel) and this API (Railway) are different
+        # sites, and a Lax/Strict cookie is never attached to a cross-site
+        # fetch/XHR request no matter what CORS allows. Requires Secure=True
+        # to be accepted by the browser at all — see settings.cookie_secure.
+        samesite="none",
         path="/",
     )
 
@@ -51,7 +55,8 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
         max_age=settings.refresh_token_expire_days * 24 * 60 * 60,
         httponly=True,
         secure=settings.cookie_secure,
-        samesite="strict",
+        # None — see _set_access_cookie above.
+        samesite="none",
         path="/auth",
     )
 

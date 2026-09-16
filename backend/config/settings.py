@@ -29,7 +29,14 @@ class Settings(BaseSettings):
     environment: str = "development"
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
-    frontend_origin: str = "http://localhost:3000"
+    # No default on purpose (see jwt_secret_key below for the same
+    # reasoning): CORS (main.py) and every redirect/callback URL built from
+    # this (Google OAuth callback, invite links) key off it directly. A
+    # silent "http://localhost:3000" fallback would mean a deployment that
+    # forgot to set FRONTEND_ORIGIN doesn't fail to start — it starts fine
+    # and then silently rejects every request from the real frontend with a
+    # CORS error that gives no hint the env var is the cause.
+    frontend_origin: str
 
     supabase_url: str = ""
     supabase_anon_key: str = ""
@@ -78,10 +85,19 @@ class Settings(BaseSettings):
 
     @property
     def cookie_secure(self) -> bool:
-        # Secure cookies are dropped by browsers over plain HTTP, which is
-        # what local `next dev` / `uvicorn` use. Require HTTPS (Secure=True)
-        # everywhere except local development.
-        return self.environment != "development"
+        # Always True. Every cookie is now SameSite=None (frontend and
+        # backend are deployed on different sites — Vercel + Railway — and
+        # SameSite=Lax/Strict cookies are never attached to cross-site
+        # fetch/XHR requests, regardless of CORS config). Browsers silently
+        # *reject* a SameSite=None cookie unless Secure is also set, so this
+        # can no longer vary by environment the way it used to.
+        #
+        # This doesn't break local dev: Chrome/Firefox/Safari all treat
+        # http://localhost as a "potentially trustworthy" secure context and
+        # still set/send Secure cookies on it without TLS. It would break on
+        # a plain-HTTP *non-localhost* host (e.g. a LAN IP), but that isn't
+        # a supported local dev setup here.
+        return True
 
     @model_validator(mode="after")
     def _require_strong_jwt_secret_outside_development(self) -> "Settings":

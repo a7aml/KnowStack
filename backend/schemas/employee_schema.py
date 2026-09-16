@@ -90,6 +90,7 @@ class AcceptInviteResponse(BaseModel):
 
 
 class EmployeeSignupRequest(BaseModel):
+    token: str
     email: EmailStr
     password: str
     confirm_password: str
