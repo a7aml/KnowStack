@@ -1,12 +1,17 @@
 """Admin-only document upload/list/delete. Actual ingestion (extract ->
-chunk -> embed) runs out of process via Celery — see
-tasks/ingestion_tasks.py. Chat/retrieval over the resulting chunks is a
-separate, not-yet-built feature and isn't touched here."""
+chunk -> embed) normally runs out of process via Celery — see
+tasks/ingestion_tasks.py.
+
+TEMPORARY: upload currently triggers that pipeline via FastAPI
+BackgroundTasks instead of Celery's .delay() — see
+controllers/document_controller.create_document() for why and how to
+revert. Chat/retrieval over the resulting chunks is a separate,
+not-yet-built feature and isn't touched here."""
 
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Query, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from config.database import get_db
@@ -35,6 +40,7 @@ _delete_limiter = RedisWindowLimiter()
 @limiter.limit("30/hour")
 async def upload_document(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     admin: AuthContext = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -43,7 +49,7 @@ async def upload_document(
         f"upload:{admin.organization_id}", max_attempts=20, window_seconds=60 * 60
     )
     content = await file.read()
-    document = document_controller.create_document(db, admin, file, content)
+    document = document_controller.create_document(db, admin, file, content, background_tasks)
     uploader_names = document_controller.attach_uploader_names(db, [document])
     return DocumentUploadResponse(
         document=document_controller.to_document_public(document, uploader_names),

@@ -1,13 +1,17 @@
 """Admin-only document management: upload, list, delete. Upload validates
 and stores the file, then hands off the actual extract/chunk/embed pipeline
-to a Celery task (tasks/ingestion_tasks.py) — this controller never blocks a
-request on that work. Chat/retrieval over the resulting chunks is a separate,
-not-yet-built feature."""
+to run out of the request/response cycle — this controller never blocks a
+request on that work.
+
+TEMPORARY: ingestion normally runs via a Celery task (tasks/ingestion_tasks.py)
+but is currently triggered via FastAPI BackgroundTasks instead — see
+create_document() below for why and how to revert. Chat/retrieval over the
+resulting chunks is a separate, not-yet-built feature."""
 
 import logging
 import uuid
 
-from fastapi import HTTPException, UploadFile, status
+from fastapi import BackgroundTasks, HTTPException, UploadFile, status
 from sqlalchemy.orm import Query, Session
 
 from middleware.auth_middleware import AuthContext
@@ -77,7 +81,13 @@ def _log_document_action(
     )
 
 
-def create_document(db: Session, admin: AuthContext, file: UploadFile, content: bytes) -> Document:
+def create_document(
+    db: Session,
+    admin: AuthContext,
+    file: UploadFile,
+    content: bytes,
+    background_tasks: BackgroundTasks,
+) -> Document:
     """`content` is the already-read request body — read by the route
     handler (an `await` the route can do but this synchronous controller
     can't) before validation, so a too-large upload is rejected with a clear
@@ -140,19 +150,27 @@ def create_document(db: Session, admin: AuthContext, file: UploadFile, content: 
     # Imported here (not at module load) to avoid the controller layer
     # importing Celery task/broker machinery for every request that merely
     # touches this module — only upload actually needs it.
-    from tasks.ingestion_tasks import process_document
+    from tasks.ingestion_tasks import run_ingestion
 
-    try:
-        process_document.delay(str(document.id))
-    except Exception:
-        # The row and file are already committed/stored — if the broker
-        # itself is unreachable, surface that as a failed document rather
-        # than leaving it stuck at 'processing' forever with nothing ever
-        # picking it up.
-        logger.exception("Failed to enqueue ingestion task for document %s", document.id)
-        document.status = "failed"
-        document.error_message = "Failed to queue document for processing."
-        db.commit()
+    # --- TEMPORARY: Celery bypass -------------------------------------------
+    # Railway's free tier only runs a single web service, so there's no
+    # worker process available to consume Celery tasks. Until a separate
+    # worker service is provisioned, ingestion is triggered via FastAPI's
+    # BackgroundTasks (runs after the response is sent, doesn't block this
+    # request) instead of tasks.ingestion_tasks.process_document.delay().
+    #
+    # Both paths call the same tasks.ingestion_tasks.run_ingestion() function,
+    # so the extract/chunk/embed pipeline logic itself is not duplicated.
+    #
+    # TODO(celery): once a worker service exists again, revert this to
+    #   process_document.delay(str(document.id))
+    # (restoring the try/except that marks the document "failed" if the
+    # broker is unreachable) and drop the background_tasks parameter from
+    # this function and its callers. celery_app.py, the worker Procfile
+    # line, and the @celery_app.task decorator on process_document are left
+    # untouched for exactly this.
+    background_tasks.add_task(run_ingestion, str(document.id))
+    # -------------------------------------------------------------------------
 
     return document
 

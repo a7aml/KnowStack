@@ -28,11 +28,28 @@ _MAX_ERROR_MESSAGE_LENGTH = 500
 
 @celery_app.task(name="tasks.ingestion_tasks.process_document")
 def process_document(document_id: str) -> None:
+    """Celery entrypoint. Just delegates to run_ingestion() so the pipeline
+    logic has exactly one implementation regardless of how it's triggered —
+    see run_ingestion() for the TEMPORARY note on its other caller."""
+    run_ingestion(document_id)
+
+
+def run_ingestion(document_id: str) -> None:
+    """The actual document-processing entrypoint, split out from the Celery
+    task above so it can be called directly.
+
+    TEMPORARY (see controllers/document_controller.py): while the Celery
+    worker service is bypassed on Railway's free tier, this function is
+    invoked synchronously via FastAPI BackgroundTasks instead of only
+    through process_document.delay(). Revert by routing callers back through
+    .delay() once a worker service exists again — this function itself
+    doesn't need to change.
+    """
     db = SessionLocal()
     try:
         document = db.get(Document, uuid.UUID(document_id))
         if document is None:
-            logger.error("process_document: document %s not found", document_id)
+            logger.error("run_ingestion: document %s not found", document_id)
             return
 
         try:
