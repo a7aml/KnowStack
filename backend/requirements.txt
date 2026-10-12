@@ -11,6 +11,7 @@ python-multipart
 httpx
 tenacity
 psycopg2-binary
+psycopg[binary]
 sqlalchemy
 alembic
 pgvector
